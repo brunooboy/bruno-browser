@@ -8,7 +8,7 @@ Navegador de perfis local-first para Windows, feito com Go, Wails, React e TypeS
 
 ## Instalação
 
-1. Baixe `Bruno Browser Setup.exe` na página de Releases.
+1. Baixe `Bruno Browser Setup.exe` na [página de Releases](https://github.com/brunooboy/bruno-browser/releases).
 2. Abra o instalador e conclua as etapas exibidas.
 3. Inicie o Bruno Browser pelo Menu Iniciar ou pelo atalho da área de trabalho.
 
@@ -76,7 +76,7 @@ O botão **Instalar CRX** abre o seletor nativo. O backend valida CRX2/CRX3, ext
 `internal/updates/version.json` é incorporado ao executável. O `version.json` da raiz pode ser publicado no GitHub e configurado em `updateUrl`, por exemplo:
 
 ```text
-https://raw.githubusercontent.com/SEU_USUARIO/bruno-browser/main/version.json
+https://raw.githubusercontent.com/brunooboy/bruno-browser/main/version.json
 ```
 
 Sem uma URL configurada, a página de Atualizações continua exibindo o changelog local.
