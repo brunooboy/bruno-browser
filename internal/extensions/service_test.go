@@ -1,0 +1,89 @@
+package extensions
+
+import (
+	"archive/zip"
+	"bytes"
+	"context"
+	"encoding/binary"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"bruno-browser/internal/domain"
+	"bruno-browser/internal/profile"
+)
+
+func TestInstallAndAssignCRX3(t *testing.T) {
+	root := t.TempDir()
+	profiles, err := profile.NewStore(filepath.Join(root, "profiles"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := profiles.Create(context.Background(), profile.Fields{
+		Name: "Perfil teste", Color: "#42ff91", Platforms: []domain.Platform{domain.PlatformGoogle}, Status: domain.StatusStarting,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := New(root, profiles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crxPath := filepath.Join(root, "sample.crx")
+	if err := os.WriteFile(crxPath, testCRX3(t), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	extension, err := service.InstallCRX(context.Background(), crxPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if extension.Name != "Sample Extension" || extension.ManifestVersion != 3 {
+		t.Fatalf("unexpected extension: %+v", extension)
+	}
+	extension, err = service.SetAssignments(context.Background(), extension.ID, []string{metadata.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(extension.AssignedProfileIDs) != 1 || extension.AssignedProfileIDs[0] != metadata.ID {
+		t.Fatalf("unexpected assignments: %+v", extension.AssignedProfileIDs)
+	}
+	if err := service.Remove(context.Background(), extension.ID); err != nil {
+		t.Fatalf("Remove assigned extension: %v", err)
+	}
+	updatedProfile, err := profiles.Get(context.Background(), metadata.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updatedProfile.ExtensionPaths) != 0 {
+		t.Fatalf("extension assignment was not removed: %+v", updatedProfile.ExtensionPaths)
+	}
+	if _, err := os.Stat(filepath.Join(root, "extensions", extension.ID)); !os.IsNotExist(err) {
+		t.Fatalf("extension directory still exists: %v", err)
+	}
+	installed, err := service.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(installed) != 0 {
+		t.Fatalf("extension remained in library: %+v", installed)
+	}
+}
+
+func testCRX3(t *testing.T) []byte {
+	t.Helper()
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+	manifest, err := writer.Create("manifest.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manifest.Write([]byte(`{"manifest_version":3,"name":"Sample Extension","version":"1.0.0"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	result := []byte{'C', 'r', '2', '4', 3, 0, 0, 0, 0, 0, 0, 0}
+	binary.LittleEndian.PutUint32(result[8:12], 0)
+	return append(result, archive.Bytes()...)
+}

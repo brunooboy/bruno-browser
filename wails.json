@@ -1,0 +1,25 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Bruno Browser",
+  "outputfilename": "Bruno Browser",
+  "assetdir": "frontend/dist",
+  "build:dir": "build",
+  "frontend:dir": "frontend",
+  "frontend:install": "node ../scripts/npm-runner.mjs ci --include=dev",
+  "frontend:build": "node ../scripts/npm-runner.mjs run build",
+  "frontend:dev:watcher": "node ../scripts/npm-runner.mjs run dev",
+  "frontend:dev:serverUrl": "auto",
+  "wailsjsdir": "./frontend/src",
+  "nsisType": "single",
+  "info": {
+    "companyName": "Bruno Browser",
+    "productName": "Bruno Browser",
+    "productVersion": "0.8.0",
+    "copyright": "Copyright (c) 2026 Bruno Browser",
+    "comments": "Local-first multi-profile Chromium workspace"
+  },
+  "author": {
+    "name": "Bruno Browser",
+    "email": ""
+  }
+}

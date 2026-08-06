@@ -1,0 +1,26 @@
+{
+  "version": "0.8.0",
+  "publishedAt": "2026-08-06T00:00:00Z",
+  "changelog": [
+    {
+      "version": "0.8.0",
+      "date": "2026-08-06",
+      "description": "Licenciamento estrito, identidade 8-bit, instalador Windows e publicação de releases."
+    },
+    {
+      "version": "0.7.0",
+      "date": "2026-08-05",
+      "description": "Aplicativo Wails, conta Discord, licenças locais, biblioteca de extensões e central de atualizações."
+    },
+    {
+      "version": "0.6.0",
+      "date": "2026-08-04",
+      "description": "Fingerprint persistente e proteção CDP aplicada antes da navegação."
+    },
+    {
+      "version": "0.5.0",
+      "date": "2026-08-03",
+      "description": "Proxy HTTP/SOCKS5 por perfil, DNS automático e bloqueio de vazamento WebRTC."
+    }
+  ]
+}
