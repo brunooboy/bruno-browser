@@ -66,3 +66,15 @@ func TestNormalizeUpdateURLIgnoresRepositoryPlaceholder(t *testing.T) {
 		t.Fatalf("real endpoint changed to %q", normalized)
 	}
 }
+
+func TestResolveUpdateURLUsesPublicRepositoryByDefault(t *testing.T) {
+	if resolved := resolveUpdateURL(""); resolved != defaultUpdateURL {
+		t.Fatalf("unexpected default update URL %q", resolved)
+	}
+
+	placeholder := "https://raw.githubusercontent.com/seu-usuario/bruno-browser/main/version.json"
+	custom := "https://updates.example.net/version.json"
+	if resolved := resolveUpdateURL(placeholder, custom); resolved != custom {
+		t.Fatalf("expected custom update URL after placeholder, got %q", resolved)
+	}
+}
