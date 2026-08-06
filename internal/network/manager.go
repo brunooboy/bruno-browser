@@ -14,17 +14,9 @@ import (
 
 const proxyTestTarget = "example.com:443"
 
-var ErrProfileRunning = errors.New("profile must be closed before changing network settings")
-
-type ProfileReservation interface {
-	BeginMaintenance(string) (release func(), ok bool)
-}
-
 type Manager struct {
-	store     *Store
-	clock     func() time.Time
-	processMu sync.RWMutex
-	processes ProfileReservation
+	store *Store
+	clock func() time.Time
 }
 
 func NewManager(store *Store) (*Manager, error) {
@@ -39,34 +31,10 @@ func (m *Manager) Get(ctx context.Context, profileID string) (Settings, error) {
 }
 
 func (m *Manager) Save(ctx context.Context, profileID string, input SaveInput) (Settings, error) {
-	m.processMu.RLock()
-	processes := m.processes
-	m.processMu.RUnlock()
-	if processes != nil {
-		current, err := m.store.Get(ctx, profileID)
-		if err != nil {
-			return Settings{}, err
-		}
-		release, ok := processes.BeginMaintenance(current.ProfileID)
-		if !ok {
-			return Settings{}, ErrProfileRunning
-		}
-		defer release()
-	}
+	// Runtime proxy bridges resolve an immutable copy of the settings during
+	// profile launch. Persisting a new route is therefore safe while a browser
+	// is open; the new route takes effect on its next launch.
 	return m.store.Save(ctx, profileID, input)
-}
-
-func (m *Manager) SetProcessState(processes ProfileReservation) error {
-	if processes == nil {
-		return errors.New("browser process state is required")
-	}
-	m.processMu.Lock()
-	defer m.processMu.Unlock()
-	if m.processes != nil {
-		return errors.New("browser process state is already configured")
-	}
-	m.processes = processes
-	return nil
 }
 
 func (m *Manager) Prepare(ctx context.Context, profileID, userDataDir string) (RuntimeSession, error) {

@@ -1,7 +1,12 @@
 {
-  "version": "0.8.0",
+  "version": "0.9.0",
   "publishedAt": "2026-08-06T00:00:00Z",
   "changelog": [
+    {
+      "version": "0.9.0",
+      "date": "2026-08-06",
+      "description": "Login Discord público com PKCE e edição de proxy liberada para a próxima abertura do perfil."
+    },
     {
       "version": "0.8.0",
       "date": "2026-08-06",

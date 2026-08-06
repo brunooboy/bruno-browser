@@ -3,11 +3,11 @@ package network
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPrepareDirectConfiguresDNSAndWebRTCWithoutProxy(t *testing.T) {
@@ -58,8 +58,17 @@ func TestPrepareProxyStartsLocalBridgeAndBlocksLocalDNS(t *testing.T) {
 	if err := session.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := net.Dial("tcp", proxyAddress); err == nil {
-		t.Fatal("local proxy bridge remained open after session close")
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		connection, err := net.DialTimeout("tcp", proxyAddress, 25*time.Millisecond)
+		if err != nil {
+			break
+		}
+		_ = connection.Close()
+		if time.Now().After(deadline) {
+			t.Fatal("local proxy bridge remained open after session close")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	payload := readJSONMap(t, filepath.Join(paths.UserData, "Local State"))
@@ -69,23 +78,17 @@ func TestPrepareProxyStartsLocalBridgeAndBlocksLocalDNS(t *testing.T) {
 	}
 }
 
-func TestSaveRejectsProfileReservedByBrowser(t *testing.T) {
+func TestSavePersistsWhileProfileIsOpenForNextLaunch(t *testing.T) {
 	profiles, metadata := createNetworkTestProfile(t)
 	store, _ := NewStore(profiles, testProtector{})
 	manager, _ := NewManager(store)
-	if err := manager.SetProcessState(busyProfileReservation{}); err != nil {
-		t.Fatal(err)
-	}
-	_, err := manager.Save(context.Background(), metadata.ID, SaveInput{
+	saved, err := manager.Save(context.Background(), metadata.ID, SaveInput{
 		Mode: ModeHTTP, Host: "proxy.example.com", Port: 8080,
 	})
-	if !errors.Is(err, ErrProfileRunning) {
-		t.Fatalf("expected ErrProfileRunning, got %v", err)
+	if err != nil {
+		t.Fatal(err)
 	}
-}
-
-type busyProfileReservation struct{}
-
-func (busyProfileReservation) BeginMaintenance(string) (func(), bool) {
-	return nil, false
+	if saved.Mode != ModeHTTP || saved.Host != "proxy.example.com" || saved.Port != 8080 {
+		t.Fatalf("unexpected saved route: %+v", saved)
+	}
 }

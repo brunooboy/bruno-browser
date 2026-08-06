@@ -21,6 +21,7 @@ const (
 	updateURLEnv             = "BRUNO_BROWSER_UPDATE_URL"
 	settingsFileName         = "appconfig.json"
 	legacySettingsFileName   = "config.json"
+	defaultDiscordClientID   = "1534690836594425896"
 	defaultUpdateURL         = "https://raw.githubusercontent.com/brunooboy/bruno-browser/main/version.json"
 )
 
@@ -65,7 +66,7 @@ func Default() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	config.DiscordClientID = firstNonEmpty(os.Getenv(discordClientIDEnv), settings.DiscordClientID)
+	config.DiscordClientID = firstNonEmpty(os.Getenv(discordClientIDEnv), settings.DiscordClientID, defaultDiscordClientID)
 	config.DiscordClientSecret = firstNonEmpty(os.Getenv(discordClientSecretEnv), settings.DiscordClientSecret)
 	config.AdminDiscordID = firstNonEmpty(os.Getenv(adminDiscordIDEnv), settings.AdminDiscordID)
 	config.UpdateURL = resolveUpdateURL(os.Getenv(updateURLEnv), settings.UpdateURL)

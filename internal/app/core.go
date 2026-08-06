@@ -77,9 +77,6 @@ func New(config config.Config) (*Core, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initialize browser manager: %w", err)
 	}
-	if err := networkManager.SetProcessState(browserManager); err != nil {
-		return nil, fmt.Errorf("connect network process guard: %w", err)
-	}
 	maintenanceService, err := maintenance.NewService(profiles, browserManager)
 	if err != nil {
 		return nil, fmt.Errorf("initialize maintenance service: %w", err)

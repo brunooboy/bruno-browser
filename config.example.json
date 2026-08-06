@@ -1,6 +1,6 @@
 {
-  "discordClientId": "SEU_CLIENT_ID",
-  "discordClientSecret": "SEU_CLIENT_SECRET",
+  "discordClientId": "1534690836594425896",
+  "discordClientSecret": "",
   "adminDiscordId": "SEU_DISCORD_ID",
   "updateUrl": "https://raw.githubusercontent.com/brunooboy/bruno-browser/main/version.json"
 }

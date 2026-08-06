@@ -3,6 +3,7 @@ package account
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -83,7 +84,7 @@ func New(dataRoot string, config Config) (*Service, error) {
 }
 
 func (s *Service) OAuthConfigured() bool {
-	return s.config.ClientID != "" && s.config.ClientSecret != ""
+	return s.config.ClientID != ""
 }
 
 func (s *Service) Get(ctx context.Context) (*User, error) {
@@ -129,6 +130,11 @@ func (s *Service) Login(ctx context.Context, openBrowser func(string) error) (Us
 		_ = listener.Close()
 		return User{}, err
 	}
+	codeVerifier, codeChallenge, err := randomPKCE()
+	if err != nil {
+		_ = listener.Close()
+		return User{}, err
+	}
 	type result struct{ code, errText string }
 	resultChannel := make(chan result, 1)
 	mux := http.NewServeMux()
@@ -155,12 +161,14 @@ func (s *Service) Login(ctx context.Context, openBrowser func(string) error) (Us
 	}()
 
 	authorizeURL := discordAuthorizeURL + "?" + url.Values{
-		"client_id":     {s.config.ClientID},
-		"redirect_uri":  {callbackURL},
-		"response_type": {"code"},
-		"scope":         {"identify"},
-		"state":         {state},
-		"prompt":        {"consent"},
+		"client_id":             {s.config.ClientID},
+		"redirect_uri":          {callbackURL},
+		"response_type":         {"code"},
+		"scope":                 {"identify"},
+		"state":                 {state},
+		"prompt":                {"consent"},
+		"code_challenge":        {codeChallenge},
+		"code_challenge_method": {"S256"},
 	}.Encode()
 	if err := openBrowser(authorizeURL); err != nil {
 		return User{}, fmt.Errorf("open Discord authorization: %w", err)
@@ -179,7 +187,7 @@ func (s *Service) Login(ctx context.Context, openBrowser func(string) error) (Us
 	if callback.code == "" {
 		return User{}, errors.New("Discord callback did not contain an authorization code")
 	}
-	token, err := s.exchangeCode(waitContext, callback.code)
+	token, err := s.exchangeCode(waitContext, callback.code, codeVerifier)
 	if err != nil {
 		return User{}, err
 	}
@@ -210,13 +218,19 @@ func (s *Service) Logout(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) exchangeCode(ctx context.Context, code string) (string, error) {
+func (s *Service) exchangeCode(ctx context.Context, code, codeVerifier string) (string, error) {
 	values := url.Values{
 		"client_id":     {s.config.ClientID},
-		"client_secret": {s.config.ClientSecret},
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
 		"redirect_uri":  {callbackURL},
+		"code_verifier": {codeVerifier},
+	}
+	// Public Client + PKCE is the safe path for distributed desktop builds.
+	// A locally configured secret remains supported for older confidential
+	// Discord applications, but it is never required or embedded in releases.
+	if s.config.ClientSecret != "" {
+		values.Set("client_secret", s.config.ClientSecret)
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, discordTokenURL, strings.NewReader(values.Encode()))
 	if err != nil {
@@ -300,6 +314,17 @@ func randomState() (string, error) {
 		return "", fmt.Errorf("create OAuth state: %w", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(payload), nil
+}
+
+func randomPKCE() (verifier, challenge string, err error) {
+	payload := make([]byte, 32)
+	if _, err := rand.Read(payload); err != nil {
+		return "", "", fmt.Errorf("create OAuth PKCE verifier: %w", err)
+	}
+	verifier = base64.RawURLEncoding.EncodeToString(payload)
+	digest := sha256.Sum256([]byte(verifier))
+	challenge = base64.RawURLEncoding.EncodeToString(digest[:])
+	return verifier, challenge, nil
 }
 
 func callbackPage(success bool, message string) string {

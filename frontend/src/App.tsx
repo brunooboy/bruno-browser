@@ -26,9 +26,10 @@ import type { AppNotification, BootstrapState, DashboardTelemetry, DiscordAccoun
 let toastSequence = 0
 
 const fallbackUpdates: UpdateStatus = {
-  currentVersion: '0.8.0', latestVersion: '0.8.0', updateAvailable: false,
+  currentVersion: '0.9.0', latestVersion: '0.9.0', updateAvailable: false,
   checkedAt: new Date().toISOString(), source: 'local',
   changelog: [
+    { version: '0.9.0', date: '2026-08-06', description: 'Login Discord público com PKCE e edição de proxy liberada para a próxima abertura do perfil.' },
     { version: '0.8.0', date: '2026-08-06', description: 'Licenciamento estrito, identidade 8-bit, instalador Windows e publicação de releases.' },
     { version: '0.7.0', date: '2026-08-05', description: 'Aplicativo Wails, conta Discord, licenças locais, biblioteca de extensões e central de atualizações.' },
     { version: '0.6.0', date: '2026-08-04', description: 'Fingerprint persistente e proteção CDP aplicada antes da navegação.' },
@@ -309,7 +310,9 @@ export default function App() {
         })
         const refreshed = await invoke<NativeProfile[]>('ListProfiles')
         setProfiles(refreshed.map(toBrowserProfile))
-        notify(`Rede de ${target.name} salva no disco.`)
+        notify(target.running
+          ? `Rede de ${target.name} salva. A nova rota será aplicada na próxima abertura do perfil.`
+          : `Rede de ${target.name} salva no disco.`)
       } catch (error) { notify(errorText(error), 'warning'); return } finally { setBusy(false) }
     } else {
       setProfiles((current) => current.map((item) => item.id !== draft.profileId ? item : draft.mode === 'direct' ? { ...item, proxy: null } : { ...item, proxy: { mode: draft.mode, host: draft.host, port: Number(draft.port), username: draft.username, hasPassword: Boolean(draft.password) || Boolean(item.proxy?.hasPassword), bypassList: draft.bypassList.split(/\r?\n|,/).filter(Boolean), location: 'Rota personalizada', countryCode: '--', endpoint: `${draft.host}:${draft.port}`, latencyMs: 0 } }))
@@ -405,7 +408,7 @@ export default function App() {
         <StatsGrid telemetry={telemetry} /><ActivityChart telemetry={telemetry} />
         <ProfileFilters count={visibleProfiles.length} onManageTags={() => setTagModalOpen(true)} onPlatformChange={setPlatform} onSortChange={setSort} onStatusChange={setStatus} onViewChange={setView} platform={platform} sort={sort} status={status} view={view} />
         {visibleProfiles.length ? <section aria-label="Lista de perfis" className={`profiles-layout profiles-layout--${view}`}>{visibleProfiles.map((item) => <ProfileCard key={item.id} now={now} onAction={handleProfileAction} onLaunch={handleLaunch} premiumActive={premiumActive} profile={item} view={view} />)}</section> : <ProfileEmptyState onReset={resetFilters} />}
-        <footer className="dashboard-footer"><span>BRUNO BROWSER // LOCAL OPERATIONS TERMINAL</span><span><i /> DADOS DO PERFIL: DISCO LOCAL</span><span>BUILD 0.8.0</span></footer>
+        <footer className="dashboard-footer"><span>BRUNO BROWSER // LOCAL OPERATIONS TERMINAL</span><span><i /> DADOS DO PERFIL: DISCO LOCAL</span><span>BUILD 0.9.0</span></footer>
       </div>}
     </main>
     <ProfileModal onClose={() => { setProfileModalOpen(false); setEditingProfile(null) }} onManageTags={() => setTagModalOpen(true)} onSave={handleSaveProfile} open={profileModalOpen} profile={editingProfile} tags={tags} />

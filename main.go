@@ -24,7 +24,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	desktop := NewDesktop(core, configuration.SettingsPath(), configuration.DiscordClientID != "" && configuration.DiscordClientSecret != "")
+	desktop := NewDesktop(core, configuration.SettingsPath(), core.Account.OAuthConfigured())
 	if err := wails.Run(&options.App{
 		Title:            "Bruno Browser",
 		Width:            1480,

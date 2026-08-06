@@ -4,7 +4,7 @@
 
 Navegador de perfis local-first para Windows, feito com Go, Wails, React e TypeScript. Cada perfil usa um diretório físico próprio do Chromium, preservando cookies, sessões e armazenamento local no disco.
 
-> Versão atual: **0.8.0** · Windows 10/11 · x64 e ARM64
+> Versão atual: **0.9.0** · Windows 10/11 · x64 e ARM64
 
 ## Instalação
 
@@ -25,12 +25,12 @@ O pacote atual ainda não possui assinatura Authenticode. Por isso, o Microsoft 
 - Proxy HTTP/SOCKS5 por perfil, DNS pelo proxy e proteção contra vazamento WebRTC.
 - Cofre de extensões CRX com associação posterior a um ou vários perfis.
 - Limpeza seletiva de cache/histórico, cookies/sessão e exclusão de perfil.
-- Login Discord OAuth2 com callback local.
+- Login Discord OAuth2 Public Client com PKCE e callback local, sem secret no aplicativo.
 - Licenças locais AES-256-GCM, planos de 1, 7 e 30 dias ou vitalício.
 - Changelog e verificação de atualização por manifesto JSON.
 - Tema e central de notificações persistentes.
 
-As operações premium são validadas novamente pelo backend antes de iniciar perfil, alterar rede ou gerenciar extensões. Remover uma key ou atingir a data de expiração bloqueia essas operações imediatamente.
+As operações premium são validadas novamente pelo backend antes de iniciar perfil, alterar rede ou gerenciar extensões. Remover uma key ou atingir a data de expiração bloqueia essas operações imediatamente. Uma rota HTTP/SOCKS5 pode ser salva com o perfil aberto e entra em vigor na próxima abertura.
 
 ## Dados locais
 
@@ -54,18 +54,17 @@ bruno-browser/
 
 O diretório pode ser alterado com `BRUNO_BROWSER_DATA_DIR`. O executável do navegador pode ser escolhido com `BRUNO_BROWSER_EXECUTABLE`.
 
-## Configuração do Discord
+## Login Discord sem configuração local
 
-1. Crie uma aplicação no [Discord Developer Portal](https://discord.com/developers/applications).
-2. Cadastre exatamente `http://localhost:34115/callback` como Redirect URI em OAuth2.
-3. Copie `config.example.json` para `config.json` e preencha Client ID, Client Secret e Discord ID do administrador.
-4. Execute o app uma vez. A configuração privada será copiada para `%AppData%\bruno-browser\appconfig.json`.
+O usuário comum não precisa criar `config.json` ou editar `appconfig.json`. O aplicativo Discord está configurado como **Public Client** e o Bruno Browser usa PKCE S256:
 
-Também são aceitas as variáveis `BRUNO_BROWSER_DISCORD_CLIENT_ID`, `BRUNO_BROWSER_DISCORD_CLIENT_SECRET`, `BRUNO_BROWSER_ADMIN_DISCORD_ID` e `BRUNO_BROWSER_UPDATE_URL`. Variáveis de ambiente têm prioridade sobre o arquivo.
+1. O app cria um verificador e um desafio criptográfico descartáveis.
+2. Abre a autorização do Discord com o Client ID público incorporado.
+3. O Discord retorna para `http://localhost:34115/callback`.
+4. O backend Go troca o código usando o verificador PKCE, sem Client Secret.
+5. O token é usado apenas para consultar ID, nome e avatar e não é persistido.
 
-`config.json` e `appconfig.json` são ignorados pelo Git. Nunca publique o Client Secret. O access token do Discord é usado somente para obter os dados do usuário e não é persistido. Depois do primeiro login, conta e licença continuam disponíveis offline.
-
-> Importante: uma instalação distribuída não deve conter o Client Secret dentro do repositório ou do instalador público. Para distribuir o login OAuth a terceiros com segurança, use um fluxo público compatível com PKCE ou um serviço mínimo que mantenha o segredo fora do aplicativo.
+`config.json` continua opcional para desenvolvimento, troca de aplicação Discord e definição do `adminDiscordId`. Também são aceitas as variáveis `BRUNO_BROWSER_DISCORD_CLIENT_ID`, `BRUNO_BROWSER_DISCORD_CLIENT_SECRET`, `BRUNO_BROWSER_ADMIN_DISCORD_ID` e `BRUNO_BROWSER_UPDATE_URL`. O campo `discordClientSecret` existe apenas para compatibilidade com aplicações confidenciais antigas e nunca é incluído na release pública.
 
 ## Extensões CRX
 

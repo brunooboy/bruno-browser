@@ -139,7 +139,7 @@ export function ProxyModal({ initialProfile, open, profiles, onClose, onSave }: 
           <div><Icon name="globe" size={17} /><span><strong>{draft.mode === 'direct' ? 'DNS AUTO DoH' : 'DNS REMOTO'}</strong><small>{draft.mode === 'direct' ? 'Redundância + fallback' : 'Pré-resolução local bloqueada'}</small></span><i /></div>
           <div><Icon name="network" size={17} /><span><strong>SEM DIRECT FALLBACK</strong><small>Falha fechada quando há proxy</small></span><i /></div>
           <div><Icon name="shield" size={17} /><span><strong>CREDENCIAL CIFRADA</strong><small>Fora das flags e metadados</small></span><i /></div>
-          <p>O perfil deve estar fechado para alterar sua rota ativa.</p>
+          <p>Você pode salvar a rota a qualquer momento. Se o perfil estiver aberto, ela será aplicada automaticamente na próxima abertura.</p>
         </aside>
 
         <footer className="modal-footer proxy-form__footer">
