@@ -336,11 +336,7 @@ func profileMetric(profile ProfileState, launch, proxy Event) ProfileMetric {
 	points := 0
 	if profile.FingerprintReady {
 		metric.FingerprintScore = 100
-		if profile.Engine == "wayfern" {
-			metric.FingerprintLabel = "Wayfern nativo verificado"
-		} else {
-			metric.FingerprintLabel = "CDP verificado"
-		}
+		metric.FingerprintLabel = "Bruno CDP verificado"
 	} else if profile.LaunchCount == 0 {
 		metric.FingerprintLabel = "Gerada na primeira abertura"
 		metric.RiskReasons = append(metric.RiskReasons, "perfil ainda não foi aberto")

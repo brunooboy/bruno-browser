@@ -21,22 +21,43 @@ func TestFindExecutableUsesExplicitFile(t *testing.T) {
 	}
 }
 
-func TestFindExecutableDiscoversDownloadedDonutWayfern(t *testing.T) {
-	localAppData := t.TempDir()
-	t.Setenv("LOCALAPPDATA", localAppData)
-	wayfernPath := filepath.Join(localAppData, "DonutBrowser", "binaries", "wayfern", "151.0.1", "wayfern-win", "wayfern.exe")
-	if err := os.MkdirAll(filepath.Dir(wayfernPath), 0o755); err != nil {
+func TestFindBundledBrunoEngine(t *testing.T) {
+	root := t.TempDir()
+	enginePath := filepath.Join(root, "engine", "chrome-win", "chrome.exe")
+	if err := os.MkdirAll(filepath.Join(filepath.Dir(enginePath), "locales"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(wayfernPath, []byte("MZ-test"), 0o700); err != nil {
+	for path, contents := range map[string][]byte{
+		enginePath: []byte("MZ-test"),
+		filepath.Join(filepath.Dir(enginePath), "chrome.dll"):           []byte("dll"),
+		filepath.Join(filepath.Dir(enginePath), "resources.pak"):        []byte("pak"),
+		filepath.Join(filepath.Dir(enginePath), "locales", "en-US.pak"): []byte("locale"),
+	} {
+		if err := os.WriteFile(path, contents, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	found, ok := findBundledBrunoEngineInRoots([]string{root})
+	if !ok {
+		t.Fatal("bundled Bruno Engine was not found")
+	}
+	if found != enginePath {
+		t.Fatalf("got %q, want bundled engine %q", found, enginePath)
+	}
+}
+
+func TestIncompleteBundledBrunoEngineIsRejected(t *testing.T) {
+	root := t.TempDir()
+	enginePath := filepath.Join(root, "engine", "chrome-win", "chrome.exe")
+	if err := os.MkdirAll(filepath.Dir(enginePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(enginePath, []byte("MZ-test"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 
-	found, err := FindExecutable("")
-	if err != nil {
-		t.Fatalf("FindExecutable: %v", err)
-	}
-	if found != wayfernPath {
-		t.Fatalf("got %q, want downloaded Wayfern %q", found, wayfernPath)
+	if _, ok := findBundledBrunoEngineInRoots([]string{root}); ok {
+		t.Fatal("incomplete Bruno Engine must not be accepted")
 	}
 }

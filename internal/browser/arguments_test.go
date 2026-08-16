@@ -27,17 +27,15 @@ func TestBuildArgumentsKeepsProfileOnDiskAndRestoresSession(t *testing.T) {
 	}
 }
 
-func TestBuildArgumentsAddsWayfernProfileIdentity(t *testing.T) {
+func TestBuildArgumentsAddsBrunoEngineSafetyFlags(t *testing.T) {
 	arguments, err := BuildArguments(LaunchOptions{
-		UserDataDir:  t.TempDir(),
-		WayfernLabel: "Conta Instagram 01",
-		WayfernColor: "#36f58b",
+		UserDataDir: t.TempDir(),
 	})
 	if err != nil {
 		t.Fatalf("BuildArguments: %v", err)
 	}
 	joined := strings.Join(arguments, "\n")
-	for _, expected := range []string{"--wayfern-profile-label=Conta Instagram 01", "--wayfern-profile-color=36F58B"} {
+	for _, expected := range []string{"--disable-search-engine-choice-screen", "--disable-component-update"} {
 		if !strings.Contains(joined, expected) {
 			t.Errorf("missing %q in arguments: %v", expected, arguments)
 		}

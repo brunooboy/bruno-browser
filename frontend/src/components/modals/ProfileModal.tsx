@@ -139,7 +139,7 @@ export function ProfileModal({ onClose, onManageTags, onSave, open, profile, tag
                 type="url"
                 value={draft.startUrl}
               />
-              <small className="field-control__hint">Usada no primeiro acesso; depois o Chromium restaura a última sessão.</small>
+              <small className="field-control__hint">Usada no primeiro acesso; depois o Bruno Engine restaura a última sessão.</small>
             </label>
           </div>
 

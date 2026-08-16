@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,14 +21,13 @@ var ErrProfileAlreadyRunning = errors.New("profile is already running")
 var ErrProfileNotRunning = errors.New("profile is not running")
 var ErrProfileUnderMaintenance = errors.New("profile is under maintenance")
 
-const wayfernNewTabURL = "chrome://newtab/"
+const brunoNewTabURL = "chrome://newtab/"
 
 type Config struct {
 	ExecutablePath string
 	ExtraArguments []string
 	PrepareNetwork NetworkPreparer
 	AttachCDP      CDPAttacher
-	AttachWayfern  CDPAttacher
 }
 
 type NetworkSession interface {
@@ -155,11 +153,7 @@ func (m *Manager) Launch(ctx context.Context, profileID, requestedURL string) (P
 	if err := EnsureProfileIdentity(paths.UserData, metadata.Name); err != nil {
 		return ProcessInfo{}, err
 	}
-	wayfernEngine := supportsWayfernProfileIdentity(executable)
 	attacher := m.config.AttachCDP
-	if wayfernEngine && m.config.AttachWayfern != nil {
-		attacher = m.config.AttachWayfern
-	}
 	controlledStartup := attacher != nil
 	if controlledStartup {
 		if err := EnsureControlledStartup(paths.UserData); err != nil {
@@ -192,7 +186,7 @@ func (m *Manager) Launch(ctx context.Context, profileID, requestedURL string) (P
 			startURL = metadata.StartURL
 		}
 		if startURL == "" {
-			startURL = neutralControlledStartURL(wayfernEngine)
+			startURL = neutralControlledStartURL()
 		}
 	} else {
 		hasPreviousSession, sessionErr := HasPreviousSession(paths.UserData)
@@ -207,10 +201,8 @@ func (m *Manager) Launch(ctx context.Context, profileID, requestedURL string) (P
 	if err != nil {
 		return ProcessInfo{}, err
 	}
-	wayfernLabel, wayfernColor := "", ""
-	if wayfernEngine {
-		wayfernLabel = metadata.Name
-		wayfernColor = metadata.Color
+	if builtInExtension, exists := findBrunoStartExtension(executable); exists {
+		extensions = append([]string{builtInExtension}, extensions...)
 	}
 	arguments, err := BuildArguments(LaunchOptions{
 		UserDataDir:      paths.UserData,
@@ -218,8 +210,6 @@ func (m *Manager) Launch(ctx context.Context, profileID, requestedURL string) (P
 		Restore:          !controlledStartup,
 		RemoteDebugging:  controlledStartup,
 		Extensions:       extensions,
-		WayfernLabel:     wayfernLabel,
-		WayfernColor:     wayfernColor,
 		ManagedArguments: networkArguments(networkSession),
 		ExtraArguments:   m.config.ExtraArguments,
 	})
@@ -264,7 +254,7 @@ func (m *Manager) Launch(ctx context.Context, profileID, requestedURL string) (P
 	info := ProcessInfo{
 		ProfileID:   metadata.ID,
 		ProfileName: metadata.Name,
-		Engine:      engineName(wayfernEngine),
+		Engine:      "bruno",
 		PID:         command.Process.Pid,
 		Executable:  executable,
 		UserDataDir: paths.UserData,
@@ -296,11 +286,11 @@ func (m *Manager) IsRunning(profileID string) bool {
 }
 
 func (m *Manager) Engine() string {
-	executable, err := FindExecutable(m.config.ExecutablePath)
+	_, err := FindExecutable(m.config.ExecutablePath)
 	if err != nil {
 		return "unavailable"
 	}
-	return engineName(supportsWayfernProfileIdentity(executable))
+	return "bruno"
 }
 
 // Stop closes the Chromium process owned by a Bruno profile. CDP-capable
@@ -410,11 +400,8 @@ func startupArgument(initialURL string, controlled bool) string {
 	return initialURL
 }
 
-func neutralControlledStartURL(wayfern bool) string {
-	if wayfern {
-		return wayfernNewTabURL
-	}
-	return "about:blank"
+func neutralControlledStartURL() string {
+	return brunoNewTabURL
 }
 
 func networkArguments(session NetworkSession) []string {
@@ -443,14 +430,15 @@ func validateExtensionDirectories(paths []string) ([]string, error) {
 	return validated, nil
 }
 
-func supportsWayfernProfileIdentity(executable string) bool {
-	normalized := strings.ToLower(filepath.ToSlash(filepath.Clean(executable)))
-	return strings.Contains(normalized, "wayfern")
-}
-
-func engineName(wayfern bool) string {
-	if wayfern {
-		return "wayfern"
+func findBrunoStartExtension(executable string) (string, bool) {
+	engineRoot := filepath.Dir(filepath.Dir(filepath.Clean(executable)))
+	extensionRoot := filepath.Join(engineRoot, "bruno-start")
+	for _, required := range []string{"manifest.json", "newtab.html", "newtab.css", "icon.png"} {
+		info, err := os.Stat(filepath.Join(extensionRoot, required))
+		if err != nil || info.IsDir() {
+			return "", false
+		}
 	}
-	return "chromium"
+	absolute, err := filepath.Abs(extensionRoot)
+	return absolute, err == nil
 }

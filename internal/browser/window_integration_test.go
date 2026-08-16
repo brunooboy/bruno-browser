@@ -18,7 +18,8 @@ func TestLiveManagerLaunchesNamedProfileWindow(t *testing.T) {
 	if os.Getenv("BRUNO_BROWSER_WINDOW_INTEGRATION") != "1" {
 		t.Skip("set BRUNO_BROWSER_WINDOW_INTEGRATION=1 to run the visible window test")
 	}
-	if _, err := FindExecutable(""); err != nil {
+	executable, err := findStockChromiumForIntegration()
+	if err != nil {
 		t.Skipf("compatible Chromium is not installed: %v", err)
 	}
 
@@ -44,15 +45,13 @@ func TestLiveManagerLaunchesNamedProfileWindow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wayfernInitialURL := ""
 	manager, err := NewManager(profileStore, Config{
-		ExtraArguments: []string{"--disable-search-engine-choice-screen", "--disable-breakpad", "--disable-crash-reporter"},
+		ExecutablePath: executable,
+		// Codex runs the child browser inside a restricted test sandbox. This
+		// flag is limited to this opt-in test and is never used by the app.
+		ExtraArguments: []string{"--no-sandbox", "--disable-search-engine-choice-screen", "--disable-breakpad", "--disable-crash-reporter"},
 		AttachCDP: func(ctx context.Context, profileID, websocketURL, initialURL string) (CDPSession, error) {
 			return controller.Attach(ctx, profileID, websocketURL, initialURL)
-		},
-		AttachWayfern: func(ctx context.Context, profileID, websocketURL, initialURL string) (CDPSession, error) {
-			wayfernInitialURL = initialURL
-			return controller.AttachWayfern(ctx, profileID, websocketURL, initialURL)
 		},
 	})
 	if err != nil {
@@ -73,14 +72,9 @@ func TestLiveManagerLaunchesNamedProfileWindow(t *testing.T) {
 	if info.ProfileName != metadata.Name || info.PID <= 0 || !manager.IsRunning(metadata.ID) {
 		t.Fatalf("unexpected running process: %#v", info)
 	}
-	if supportsWayfernProfileIdentity(info.Executable) {
-		if wayfernInitialURL != wayfernNewTabURL {
-			t.Fatalf("Wayfern empty profile opened %q instead of the clean new-tab page", wayfernInitialURL)
-		}
-		health := controller.Health(context.Background(), metadata.ID)
-		if !health.WayfernReady || health.Error != "" {
-			t.Fatalf("native Wayfern fingerprint was not persisted: %#v", health)
-		}
+	health := controller.Health(context.Background(), metadata.ID)
+	if !health.StandardReady || health.Error != "" {
+		t.Fatalf("Bruno CDP fingerprint was not verified: %#v", health)
 	}
 
 	paths, err := profileStore.Paths(metadata.ID)

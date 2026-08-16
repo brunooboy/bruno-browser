@@ -24,6 +24,7 @@ const riskLabel = {
 export function ProfileCard({ now, onAction, onLaunch, premiumActive, profile, view }: ProfileCardProps) {
   const maturity = maturityFor(profile.createdAt, now)
   const age = formatAge(profile.createdAt, now)
+  const engineLabel = profile.engine === 'bruno' ? 'Bruno Engine' : profile.engine ?? 'motor desconhecido'
 
   return (
     <article
@@ -73,7 +74,7 @@ export function ProfileCard({ now, onAction, onLaunch, premiumActive, profile, v
         <div>
           <span><Icon name="shield" size={14} /> Fingerprint</span>
           <strong className={profile.fingerprintScore < 100 ? 'metric-danger' : ''}>{profile.fingerprintScore === 100 ? '100% verificado' : 'Pendente'}</strong>
-          <small>{profile.fingerprintLabel ?? 'Sem leitura'} · {profile.engine ?? 'motor desconhecido'} · {profile.sessions} aberturas</small>
+          <small>{profile.fingerprintLabel ?? 'Sem leitura'} · {engineLabel} · {profile.sessions} aberturas</small>
         </div>
       </div>
 

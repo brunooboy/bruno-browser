@@ -4,7 +4,7 @@
 
 Navegador de perfis local-first para Windows, feito com Go, Wails, React e TypeScript. Cada perfil usa um diretório físico próprio do Chromium, preservando cookies, sessões e armazenamento local no disco.
 
-> Versão atual: **0.9.0** · Windows 10/11 · x64 e ARM64
+> Versão atual: **1.0.0** · Windows 10/11 · x64 e ARM64
 
 ## Instalação
 
@@ -12,7 +12,7 @@ Navegador de perfis local-first para Windows, feito com Go, Wails, React e TypeS
 2. Abra o instalador e conclua as etapas exibidas.
 3. Inicie o Bruno Browser pelo Menu Iniciar ou pelo atalho da área de trabalho.
 
-O instalador identifica automaticamente se o Windows é x64 ou ARM64, instala somente o executável correto em `%LocalAppData%\Programs\Bruno Browser` e não exige privilégios de administrador. Se o Microsoft WebView2 Runtime não estiver disponível, o instalador obtém e instala o componente oficial apropriado.
+O instalador identifica automaticamente se o Windows é x64 ou ARM64, instala somente o executável correto e o **Bruno Engine** correspondente em `%LocalAppData%\Programs\Bruno Browser` e não exige privilégios de administrador. O motor é uma compilação oficial e imutável do Chromium, validada por SHA-256 durante o build. Não é necessário instalar Chrome, Edge, Donut Browser ou Wayfern. Se o Microsoft WebView2 Runtime não estiver disponível, o instalador instala o componente incorporado.
 
 O pacote atual ainda não possui assinatura Authenticode. Por isso, o Microsoft SmartScreen pode exibir um aviso em algumas máquinas. Para eliminar esse aviso em distribuição pública é necessário assinar o instalador e o executável com um certificado de assinatura de código confiável.
 
@@ -20,8 +20,8 @@ O pacote atual ainda não possui assinatura Authenticode. Por isso, o Microsoft 
 
 - Perfis persistentes com `--user-data-dir` exclusivo e restauração de sessão.
 - Metadados, plataformas, tags, notas e maturidade por perfil.
-- Inicialização do Chromium/Wayfern em janela separada e identificada pelo perfil.
-- Fingerprint persistente por perfil aplicado por CDP quando o navegador permite automação.
+- Bruno Engine integrado, com ícone e página inicial próprios, iniciado em uma janela separada por perfil.
+- Fingerprint persistente e exclusivo por perfil, aplicado e verificado por CDP antes da navegação.
 - Proxy HTTP/SOCKS5 por perfil, DNS pelo proxy e proteção contra vazamento WebRTC.
 - Cofre de extensões CRX com associação posterior a um ou vários perfis.
 - Limpeza seletiva de cache/histórico, cookies/sessão e exclusão de perfil.
@@ -48,11 +48,12 @@ bruno-browser/
     └── <profile-uuid>/
         ├── metadata.json
         ├── fingerprint.json
+        ├── fingerprint-verification.json
         ├── network.json
         └── chromium/          user-data-dir do navegador
 ```
 
-O diretório pode ser alterado com `BRUNO_BROWSER_DATA_DIR`. O executável do navegador pode ser escolhido com `BRUNO_BROWSER_EXECUTABLE`.
+O diretório pode ser alterado com `BRUNO_BROWSER_DATA_DIR`. Em desenvolvimento, `BRUNO_BROWSER_EXECUTABLE` permite testar explicitamente outro executável; as releases usam o Bruno Engine instalado ao lado do aplicativo.
 
 ## Login Discord sem configuração local
 
@@ -82,7 +83,7 @@ Sem uma URL configurada, a página de Atualizações continua exibindo o changel
 
 ## Desenvolvimento e testes
 
-Requisitos: Go 1.26+, Node.js 22.12+, npm 10+ e Windows 10/11.
+Requisitos: Go 1.26+, Node.js 22.12+, npm 10+, Windows 10/11 e aproximadamente 3 GB livres para o cache de build. Na primeira compilação, o script baixa os snapshots oficiais x64/ARM64 indicados em `scripts/engine-manifest.json`, valida tamanho e SHA-256, aplica somente os recursos visuais do Bruno Engine (ícone e metadados do executável) e reutiliza o cache nas compilações seguintes.
 
 Para executar como aplicativo desktop real:
 
@@ -104,12 +105,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-app.ps1
 
 Arquivos gerados em `build\bin`:
 
-- `Bruno Browser Setup.exe`: instalador único para Windows x64 e ARM64.
-- `Bruno Browser.exe`: versão portátil x64.
+- `Bruno Browser Setup.exe`: instalador único para Windows x64 e ARM64, incluindo o Bruno Engine.
+- `Bruno Browser.exe`: executável x64 para uso com a pasta `engine` gerada ao lado dele.
 - `Bruno Browser-amd64.exe`: binário x64.
 - `Bruno Browser-arm64.exe`: binário ARM64.
+- `Bruno-Browser-portable-amd64.zip`: pacote portátil completo x64.
+- `Bruno-Browser-portable-arm64.zip`: pacote portátil completo ARM64.
 
-Para compilar somente um executável portátil, use `-Direct`. Para pular o instalador, use `-NoInstaller`.
+Para compilar diretamente o aplicativo e copiar o motor x64 ao lado dele, use `-Direct`. Para pular o instalador, use `-NoInstaller`. Copiar apenas o arquivo `.exe` sem a pasta `engine` não constitui um pacote portátil completo.
 
 ## Limites de segurança do licenciamento local
 

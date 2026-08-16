@@ -1,0 +1,24 @@
+{
+  "name": "Bruno Engine",
+  "upstream": "Chromium",
+  "branding": {
+    "version": "1",
+    "toolUrl": "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe",
+    "toolBytes": 1360384,
+    "toolSha256": "3E7801DB1A5EDBEC91B49A24A094AAD776CB4515488EA5A4CA2289C400EADE2A"
+  },
+  "platforms": {
+    "amd64": {
+      "revision": "1674699",
+      "url": "https://commondatastorage.googleapis.com/chromium-browser-snapshots/Win_x64/1674699/chrome-win.zip",
+      "bytes": 344274051,
+      "sha256": "3FD8FB1A05F82090D7309BBEF27D868284D307C6F2A4208FEAE8F6A8C98062CF"
+    },
+    "arm64": {
+      "revision": "1674673",
+      "url": "https://commondatastorage.googleapis.com/chromium-browser-snapshots/Win_Arm64/1674673/chrome-win.zip",
+      "bytes": 327908645,
+      "sha256": "7F3EC01555EA84A1E88187C6CBB4FA782F98D15C1A9CCD9091C71D24035B186A"
+    }
+  }
+}

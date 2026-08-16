@@ -1,0 +1,32 @@
+Bruno Browser - Third-Party Notices
+===================================
+
+Bruno Engine is based on Chromium snapshot binaries downloaded from the
+official Chromium build storage. Bruno Browser changes the Windows executable
+icon and version-resource strings, and adds its own local new-tab extension;
+Chromium browser code is otherwise unchanged:
+
+https://commondatastorage.googleapis.com/chromium-browser-snapshots/
+
+Pinned Windows revisions:
+- x64: 1674699
+- ARM64: 1674673
+
+Chromium is Copyright 2015 The Chromium Authors and is licensed under the
+3-clause BSD license. The full license is available at:
+
+https://chromium.googlesource.com/chromium/src/+/main/LICENSE
+
+Chromium includes third-party components under their respective licenses.
+Their notices are available from the engine itself at chrome://credits and
+from the Chromium source tree corresponding to each pinned revision.
+
+The build process uses RCEdit v2.0.0 to update Windows executable resources:
+
+https://github.com/electron/rcedit
+
+RCEdit is Copyright (c) Electron contributors and is licensed under the MIT
+license. RCEdit is a build-time tool and is not included in the installer.
+
+Bruno Browser is not affiliated with Google, Chromium, Donut Browser or
+Wayfern. No Wayfern or Donut Browser binary is included in this distribution.

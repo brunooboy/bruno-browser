@@ -1,6 +1,7 @@
 /build/bin/
 /build/windows/installer/tmp/
 /build/windows/installer/wails_tools.nsh
+/build/windows/engine/
 /frontend/dist/
 /frontend/node_modules/
 /frontend/src/wailsjs/

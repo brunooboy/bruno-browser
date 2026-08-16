@@ -28,7 +28,7 @@ export interface NativeProfile {
   extensionPaths: string[]
   proxy: NativeProxy | null
   running: boolean
-  engine: 'wayfern' | 'chromium' | 'unavailable'
+  engine: 'bruno' | 'chromium' | 'unavailable'
   fingerprintScore: number
   fingerprintLabel: string
   risk: 'low' | 'medium' | 'high'

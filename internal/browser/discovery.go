@@ -7,11 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 )
 
-var ErrBrowserNotFound = errors.New("Chromium executable not found")
+var ErrBrowserNotFound = errors.New("Bruno Engine executable was not found")
 
 func FindExecutable(explicitPath string) (string, error) {
 	if strings.TrimSpace(explicitPath) != "" {
@@ -22,9 +21,13 @@ func FindExecutable(explicitPath string) (string, error) {
 		return path, nil
 	}
 	if runtime.GOOS == "windows" {
-		if path, ok := findDownloadedDonutWayfern(); ok {
+		if path, ok := findBundledBrunoEngine(); ok {
 			return path, nil
 		}
+		// Windows releases are intentionally self-contained. Falling back to an
+		// arbitrary Chrome, Edge or Donut installation would make fingerprints,
+		// extensions and command-line behavior differ between computers.
+		return "", ErrBrowserNotFound
 	}
 
 	for _, name := range executableNames(runtime.GOOS) {
@@ -42,37 +45,54 @@ func FindExecutable(explicitPath string) (string, error) {
 	return "", ErrBrowserNotFound
 }
 
-// findDownloadedDonutWayfern reuses an already-downloaded free Wayfern engine.
-// Bruno never writes to Donut's directory and falls back to the installed
-// Chromium family when no compatible binary is present.
-func findDownloadedDonutWayfern() (string, bool) {
-	localAppData := strings.TrimSpace(os.Getenv("LOCALAPPDATA"))
-	if localAppData == "" {
-		return "", false
+func findBundledBrunoEngine() (string, bool) {
+	roots := make([]string, 0, 2)
+	if executable, err := os.Executable(); err == nil {
+		roots = append(roots, filepath.Dir(executable))
 	}
-	versionsRoot := filepath.Join(localAppData, "DonutBrowser", "binaries", "wayfern")
-	versions, err := os.ReadDir(versionsRoot)
-	if err != nil {
-		return "", false
+	if workingDirectory, err := os.Getwd(); err == nil {
+		roots = append(roots, workingDirectory)
 	}
-	sort.Slice(versions, func(left, right int) bool {
-		return versions[left].Name() > versions[right].Name()
-	})
-	for _, version := range versions {
-		if !version.IsDir() {
-			continue
-		}
-		versionRoot := filepath.Join(versionsRoot, version.Name())
-		for _, directory := range []string{"", "bin", "wayfern", "wayfern-win", "chrome-win"} {
-			for _, name := range []string{"wayfern.exe", "chromium.exe", "chrome.exe"} {
-				candidate := filepath.Join(versionRoot, directory, name)
-				if path, validationErr := validateExecutablePath(candidate); validationErr == nil {
-					return path, true
-				}
+	return findBundledBrunoEngineInRoots(roots)
+}
+
+func findBundledBrunoEngineInRoots(roots []string) (string, bool) {
+	for _, root := range roots {
+		for _, relativePath := range []string{
+			filepath.Join("engine", "chrome-win", "chrome.exe"),
+			filepath.Join("build", "bin", "engine", "chrome-win", "chrome.exe"),
+			filepath.Join("bruno-engine", "chrome-win", "chrome.exe"),
+			filepath.Join("chrome-win", "chrome.exe"),
+		} {
+			candidate := filepath.Join(root, relativePath)
+			if path, validationErr := validateBrunoEnginePath(candidate); validationErr == nil {
+				return path, true
 			}
 		}
 	}
 	return "", false
+}
+
+func validateBrunoEnginePath(path string) (string, error) {
+	executable, err := validateExecutablePath(path)
+	if err != nil {
+		return "", err
+	}
+	directory := filepath.Dir(executable)
+	for _, required := range []string{
+		"chrome.dll",
+		"resources.pak",
+		filepath.Join("locales", "en-US.pak"),
+	} {
+		info, statErr := os.Stat(filepath.Join(directory, required))
+		if statErr != nil {
+			return "", fmt.Errorf("Bruno Engine is incomplete: %s: %w", required, statErr)
+		}
+		if info.IsDir() {
+			return "", fmt.Errorf("Bruno Engine is incomplete: %s is a directory", required)
+		}
+	}
+	return executable, nil
 }
 
 func validateExecutablePath(path string) (string, error) {

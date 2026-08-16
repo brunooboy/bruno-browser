@@ -43,6 +43,16 @@ func TestStoreKeepsOneStableFingerprintPerPhysicalProfile(t *testing.T) {
 	if first != second || first.Seed == "" || !first.CreatedAt.Equal(fixedTime) {
 		t.Fatalf("fingerprint was not stable: first=%#v second=%#v", first, second)
 	}
+	if _, verified, err := store.InspectVerification(context.Background(), metadata.ID); err != nil || verified {
+		t.Fatalf("unapplied fingerprint was reported as verified: verified=%v err=%v", verified, err)
+	}
+	if err := store.MarkVerified(context.Background(), metadata.ID, "153.0.7994.0"); err != nil {
+		t.Fatalf("MarkVerified: %v", err)
+	}
+	verification, verified, err := store.InspectVerification(context.Background(), metadata.ID)
+	if err != nil || !verified || verification.ProfileID != metadata.ID || verification.BrowserVersion != "153.0.7994.0" || !verification.VerifiedAt.Equal(fixedTime) {
+		t.Fatalf("unexpected fingerprint verification: value=%#v verified=%v err=%v", verification, verified, err)
+	}
 	paths, err := profileStore.Paths(metadata.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -50,6 +60,49 @@ func TestStoreKeepsOneStableFingerprintPerPhysicalProfile(t *testing.T) {
 	info, err := os.Stat(filepath.Join(paths.Root, fingerprintFileName))
 	if err != nil || info.IsDir() {
 		t.Fatalf("fingerprint.json was not persisted: %v", err)
+	}
+}
+
+func TestPhysicalProfilesReceiveIndependentStableFingerprints(t *testing.T) {
+	profileStore, err := profile.NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstMetadata, err := profileStore.Create(context.Background(), profile.Fields{
+		Name: "Conta A", Color: "#36f58b", Status: domain.StatusStarting,
+		Platforms: []domain.Platform{domain.PlatformInstagram},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondMetadata, err := profileStore.Create(context.Background(), profile.Fields{
+		Name: "Conta B", Color: "#ff4d6d", Status: domain.StatusStarting,
+		Platforms: []domain.Platform{domain.PlatformGoogle},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(profileStore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := store.LoadOrCreate(context.Background(), firstMetadata.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.LoadOrCreate(context.Background(), secondMetadata.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ProfileID == second.ProfileID || first.Seed == second.Seed {
+		t.Fatalf("profiles shared fingerprint identity: first=%#v second=%#v", first, second)
+	}
+	firstAgain, err := store.LoadOrCreate(context.Background(), firstMetadata.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstAgain != first {
+		t.Fatalf("first fingerprint changed after second profile creation: first=%#v again=%#v", first, firstAgain)
 	}
 }
 

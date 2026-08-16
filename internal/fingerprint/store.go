@@ -20,13 +20,37 @@ import (
 )
 
 const (
-	fingerprintFileName = "fingerprint.json"
-	wayfernFileName     = "wayfern-fingerprint.json"
-	maxFingerprintSize  = 256 << 10
+	fingerprintFileName  = "fingerprint.json"
+	verificationFileName = "fingerprint-verification.json"
+	maxFingerprintSize   = 256 << 10
+	verificationSchema   = 1
 )
 
 type PathProvider interface {
 	Paths(string) (profile.Paths, error)
+}
+
+type Verification struct {
+	SchemaVersion  int       `json:"schemaVersion"`
+	ProfileID      string    `json:"profileId"`
+	BrowserVersion string    `json:"browserVersion"`
+	VerifiedAt     time.Time `json:"verifiedAt"`
+}
+
+func (verification Verification) Validate() error {
+	if verification.SchemaVersion != verificationSchema {
+		return fmt.Errorf("unsupported fingerprint verification schema %d", verification.SchemaVersion)
+	}
+	if strings.TrimSpace(verification.ProfileID) == "" {
+		return errors.New("fingerprint verification profile id is required")
+	}
+	if strings.TrimSpace(verification.BrowserVersion) == "" {
+		return errors.New("fingerprint verification browser version is required")
+	}
+	if verification.VerifiedAt.IsZero() {
+		return errors.New("fingerprint verification time is required")
+	}
+	return nil
 }
 
 // Inspect validates an existing Bruno CDP fingerprint without creating one.
@@ -50,49 +74,57 @@ func (store *Store) Inspect(ctx context.Context, profileID string) (Profile, boo
 	return stored, true, nil
 }
 
-func (store *Store) LoadWayfern(ctx context.Context, profileID string) (map[string]any, bool, error) {
+// InspectVerification only reports ready after a real CDP session has applied
+// the persistent identity to a page and enabled browser-wide auto-attach.
+func (store *Store) InspectVerification(ctx context.Context, profileID string) (Verification, bool, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, false, err
+		return Verification{}, false, err
 	}
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	paths, err := store.paths.Paths(profileID)
 	if err != nil {
-		return nil, false, err
+		return Verification{}, false, err
 	}
-	contents, err := os.ReadFile(filepath.Join(paths.Root, wayfernFileName))
+	file, err := os.Open(filepath.Join(paths.Root, verificationFileName))
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, false, nil
+		return Verification{}, false, nil
 	}
 	if err != nil {
-		return nil, false, err
+		return Verification{}, false, err
 	}
-	if len(contents) == 0 || len(contents) > maxFingerprintSize {
-		return nil, false, errors.New("Wayfern fingerprint file has an invalid size")
+	defer file.Close()
+	decoder := json.NewDecoder(io.LimitReader(file, maxFingerprintSize+1))
+	decoder.DisallowUnknownFields()
+	var verification Verification
+	if err := decoder.Decode(&verification); err != nil {
+		return Verification{}, false, fmt.Errorf("decode fingerprint verification: %w", err)
 	}
-	var stored map[string]any
-	if err := json.Unmarshal(contents, &stored); err != nil {
-		return nil, false, fmt.Errorf("decode Wayfern fingerprint: %w", err)
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return Verification{}, false, errors.New("fingerprint verification contains trailing JSON content")
 	}
-	if len(stored) == 0 {
-		return nil, false, errors.New("Wayfern fingerprint is empty")
+	if err := verification.Validate(); err != nil {
+		return Verification{}, false, err
 	}
-	return stored, true, nil
+	if verification.ProfileID != profileID {
+		return Verification{}, false, errors.New("fingerprint verification profile id does not match its directory")
+	}
+	return verification, true, nil
 }
 
-func (store *Store) SaveWayfern(ctx context.Context, profileID string, value map[string]any) error {
+func (store *Store) MarkVerified(ctx context.Context, profileID, browserVersion string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if len(value) == 0 {
-		return errors.New("Wayfern fingerprint is empty")
+	verification := Verification{
+		SchemaVersion:  verificationSchema,
+		ProfileID:      profileID,
+		BrowserVersion: strings.TrimSpace(browserVersion),
+		VerifiedAt:     store.clock().UTC(),
 	}
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Errorf("encode Wayfern fingerprint: %w", err)
-	}
-	if len(encoded) > maxFingerprintSize {
-		return errors.New("Wayfern fingerprint exceeds the size limit")
+	if err := verification.Validate(); err != nil {
+		return err
 	}
 	store.mu.Lock()
 	defer store.mu.Unlock()
@@ -100,7 +132,7 @@ func (store *Store) SaveWayfern(ctx context.Context, profileID string, value map
 	if err != nil {
 		return err
 	}
-	return storage.WriteJSONAtomic(filepath.Join(paths.Root, wayfernFileName), value, 0o600)
+	return storage.WriteJSONAtomic(filepath.Join(paths.Root, verificationFileName), verification, 0o600)
 }
 
 type Store struct {

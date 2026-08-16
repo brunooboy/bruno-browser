@@ -1,7 +1,12 @@
 {
-  "version": "0.9.0",
-  "publishedAt": "2026-08-06T00:00:00Z",
+  "version": "1.0.0",
+  "publishedAt": "2026-08-16T00:00:00Z",
   "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2026-08-16",
+      "description": "Bruno Engine integrado com identidade visual própria, página inicial local e fingerprint CDP isolado e verificado por perfil."
+    },
     {
       "version": "0.9.0",
       "date": "2026-08-06",

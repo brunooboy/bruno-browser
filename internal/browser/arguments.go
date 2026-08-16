@@ -15,8 +15,6 @@ type LaunchOptions struct {
 	Restore          bool
 	RemoteDebugging  bool
 	Extensions       []string
-	WayfernLabel     string
-	WayfernColor     string
 	ManagedArguments []string
 	ExtraArguments   []string
 }
@@ -59,6 +57,8 @@ func BuildArguments(options LaunchOptions) ([]string, error) {
 		"--disable-default-apps",
 		"--disable-background-mode",
 		"--disable-session-crashed-bubble",
+		"--disable-search-engine-choice-screen",
+		"--disable-component-update",
 		"--start-maximized",
 	}
 	if options.Restore {
@@ -69,19 +69,6 @@ func BuildArguments(options LaunchOptions) ([]string, error) {
 			"--remote-debugging-address=127.0.0.1",
 			"--remote-debugging-port=0",
 		)
-	}
-
-	if label := strings.TrimSpace(options.WayfernLabel); label != "" {
-		arguments = append(arguments, "--wayfern-profile-label="+label)
-	}
-	if color := strings.TrimSpace(options.WayfernColor); color != "" {
-		color = strings.TrimPrefix(color, "#")
-		if len(color) != 6 || strings.IndexFunc(color, func(character rune) bool {
-			return !strings.ContainsRune("0123456789abcdefABCDEF", character)
-		}) >= 0 {
-			return nil, fmt.Errorf("wayfern profile color must use RRGGBB format")
-		}
-		arguments = append(arguments, "--wayfern-profile-color="+strings.ToUpper(color))
 	}
 
 	if len(options.Extensions) > 0 {

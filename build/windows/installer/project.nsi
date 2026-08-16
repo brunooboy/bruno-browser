@@ -30,8 +30,8 @@ BrandingText "Bruno Browser // Local Operations"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${PRODUCT_EXECUTABLE}"
 !define MUI_FINISHPAGE_RUN_TEXT "Abrir o Bruno Browser agora"
 !define MUI_WELCOMEPAGE_TITLE "Instalar o Bruno Browser"
-!define MUI_WELCOMEPAGE_TEXT "Perfis persistentes, operações locais e controle de rede em uma interface segura.$\r$\n$\r$\nO assistente instalará o aplicativo somente para o seu usuário. Seus perfis e sessões permanecem no disco local."
-!define MUI_DIRECTORYPAGE_TEXT_TOP "Escolha a pasta onde o Bruno Browser será instalado. Seus dados de perfis são mantidos separadamente na pasta de dados do usuário."
+!define MUI_WELCOMEPAGE_TEXT "Perfis persistentes, operações locais e controle de rede em uma interface segura.$\r$\n$\r$\nO Bruno Engine será instalado junto com o aplicativo. Nenhum Chrome, Edge, Donut ou Wayfern externo é necessário."
+!define MUI_DIRECTORYPAGE_TEXT_TOP "Escolha a pasta onde o Bruno Browser e o Bruno Engine serão instalados. Reserve aproximadamente 1 GB de espaço em disco."
 !define MUI_FINISHPAGE_TITLE "Bruno Browser instalado"
 !define MUI_FINISHPAGE_TEXT "A instalação foi concluída. Um atalho foi criado no Menu Iniciar e na Área de Trabalho."
 
@@ -65,6 +65,27 @@ Section "Bruno Browser" SEC_APP
 
     SetOutPath "$INSTDIR"
     !insertmacro wails.files
+    File "/oname=THIRD_PARTY_NOTICES.txt" "..\..\..\docs\THIRD_PARTY_NOTICES.txt"
+
+    DetailPrint "Instalando Bruno Engine para esta arquitetura..."
+    SetOutPath "$INSTDIR\engine"
+    ${If} ${IsNativeAMD64}
+        File /r "..\..\..\.cache\bruno-engine\extracted\amd64-1674699\*.*"
+    ${ElseIf} ${IsNativeARM64}
+        File /r "..\..\..\.cache\bruno-engine\extracted\arm64-1674673\*.*"
+    ${EndIf}
+    File "/oname=manifest.json" "..\..\..\scripts\engine-manifest.json"
+
+    SetOutPath "$INSTDIR\engine\bruno-start"
+    File "..\..\..\assets\bruno-start\manifest.json"
+    File "..\..\..\assets\bruno-start\newtab.html"
+    File "..\..\..\assets\bruno-start\newtab.css"
+    File "/oname=icon.png" "..\..\..\docs\assets\bruno-browser-icon.png"
+
+    IfFileExists "$INSTDIR\engine\chrome-win\chrome.exe" engineReady
+        MessageBox MB_ICONSTOP "O Bruno Engine não pôde ser instalado. Execute o instalador novamente."
+        Abort
+    engineReady:
 
     WriteRegStr HKCU "Software\Bruno Browser" "InstallDir" "$INSTDIR"
     CreateDirectory "$SMPROGRAMS\Bruno Browser"

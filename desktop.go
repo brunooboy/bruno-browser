@@ -418,9 +418,6 @@ func (d *Desktop) telemetryStates(ctx context.Context, metadataList []domain.Met
 		}
 		health := d.core.Fingerprint.Health(ctx, metadata.ID)
 		fingerprintReady := health.StandardReady
-		if engine == "wayfern" {
-			fingerprintReady = health.WayfernReady
-		}
 		states = append(states, telemetry.ProfileState{
 			ID: metadata.ID, CreatedAt: metadata.CreatedAt, LastLaunchedAt: metadata.LastLaunchedAt,
 			LaunchCount: metadata.LaunchCount, Running: d.core.Browser.IsRunning(metadata.ID), Engine: engine,

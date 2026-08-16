@@ -13,17 +13,15 @@ import (
 const chromiumIdentityFileLimit = 16 << 20
 
 // Chromium keys NTP blacklist entries by the MD5 of the URL. These values
-// cover the Donut landing-page variants that Wayfern may visit on a brand-new
-// user-data directory before Bruno takes control of the initial page.
-var hiddenWayfernShortcuts = []string{
+// cover legacy third-party landing shortcuts left by older Bruno builds.
+var hiddenLegacyShortcuts = []string{
 	"a9846c4b18ffd084675a983d194b45a6", // https://donutbrowser.com/
 	"533d54915b68f87353bf907dfc4327e5", // https://donutbrowser.com
 	"a11bd361b9da3734518ab321ce86a44b", // http://donutbrowser.com/
 }
 
 // EnsureProfileIdentity persists the Bruno profile name in Chromium's own
-// profile files. Stock Chromium displays this identity in its profile UI;
-// Wayfern additionally renders it directly in the browser toolbar.
+// profile files and removes obsolete third-party marketing shortcuts.
 func EnsureProfileIdentity(userDataDir, profileName string) error {
 	profileName = strings.TrimSpace(profileName)
 	if profileName == "" {
@@ -49,7 +47,7 @@ func EnsureProfileIdentity(userDataDir, profileName string) error {
 		profile["using_default_name"] = false
 		ntp := childObject(document, "ntp")
 		blacklist := childObject(ntp, "most_visited_blacklist")
-		for _, shortcutHash := range hiddenWayfernShortcuts {
+		for _, shortcutHash := range hiddenLegacyShortcuts {
 			blacklist[shortcutHash] = nil
 		}
 	}); err != nil {

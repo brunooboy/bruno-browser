@@ -70,9 +70,6 @@ func New(config config.Config) (*Core, error) {
 		AttachCDP: func(ctx context.Context, profileID, websocketURL, initialURL string) (browser.CDPSession, error) {
 			return fingerprintController.Attach(ctx, profileID, websocketURL, initialURL)
 		},
-		AttachWayfern: func(ctx context.Context, profileID, websocketURL, initialURL string) (browser.CDPSession, error) {
-			return fingerprintController.AttachWayfern(ctx, profileID, websocketURL, initialURL)
-		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("initialize browser manager: %w", err)

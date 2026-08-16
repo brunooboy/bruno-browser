@@ -53,7 +53,7 @@ export function ProxyPage({ profiles, premiumActive, testingId, onConfigure, onT
           <span className="dns-route-panel__live"><i /> ATIVO</span>
         </div>
         <div className="dns-route-panel__flow">
-          <div><Icon name="globe" size={19} /><span>PERFIL</span><strong>Chromium isolado</strong></div>
+          <div><Icon name="globe" size={19} /><span>PERFIL</span><strong>Bruno Engine isolado</strong></div>
           <i><span /></i>
           <div><Icon name="shield" size={19} /><span>POLÍTICA</span><strong>Anti-vazamento</strong></div>
           <i><span /></i>

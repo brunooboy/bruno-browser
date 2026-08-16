@@ -46,7 +46,7 @@ func TestEnsureProfileIdentityCreatesAndPreservesProfileFiles(t *testing.T) {
 		t.Fatalf("unexpected Preferences profile identity: %#v", preferenceProfile)
 	}
 	blacklist := preferences["ntp"].(map[string]any)["most_visited_blacklist"].(map[string]any)
-	for _, shortcutHash := range hiddenWayfernShortcuts {
+	for _, shortcutHash := range hiddenLegacyShortcuts {
 		if _, exists := blacklist[shortcutHash]; !exists {
 			t.Fatalf("Donut shortcut hash %s was not suppressed: %#v", shortcutHash, blacklist)
 		}

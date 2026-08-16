@@ -22,24 +22,22 @@ type Controller struct {
 
 type Health struct {
 	StandardReady bool   `json:"standardReady"`
-	WayfernReady  bool   `json:"wayfernReady"`
 	Error         string `json:"error,omitempty"`
 }
 
 func (controller *Controller) Health(ctx context.Context, profileID string) Health {
 	var health Health
-	if _, exists, err := controller.store.Inspect(ctx, profileID); err != nil {
+	_, identityExists, err := controller.store.Inspect(ctx, profileID)
+	if err != nil {
 		health.Error = err.Error()
-	} else {
-		health.StandardReady = exists
+		return health
 	}
-	if _, exists, err := controller.store.LoadWayfern(ctx, profileID); err != nil {
-		if health.Error == "" {
-			health.Error = err.Error()
-		}
-	} else {
-		health.WayfernReady = exists
+	_, verified, err := controller.store.InspectVerification(ctx, profileID)
+	if err != nil {
+		health.Error = err.Error()
+		return health
 	}
+	health.StandardReady = identityExists && verified
 	return health
 }
 
@@ -86,8 +84,8 @@ func (controller *Controller) Attach(ctx context.Context, profileID, websocketUR
 	if strings.TrimSpace(websocketURL) == "" {
 		return nil, errors.New("DevTools websocket URL is required")
 	}
-	if !restorableURL(initialURL) && initialURL != "about:blank" {
-		return nil, errors.New("initial page must use http or https")
+	if !initialURLAllowed(initialURL) {
+		return nil, errors.New("initial page must use http, https or the Bruno new-tab page")
 	}
 	stored, err := controller.store.LoadOrCreate(ctx, profileID)
 	if err != nil {
@@ -156,10 +154,6 @@ func (controller *Controller) Attach(ctx context.Context, profileID, websocketUR
 	}
 	session.wg.Add(1)
 	go session.eventLoop()
-	if err := session.applyProtection(operationContext, attached.SessionID, "page", false); err != nil {
-		session.Close()
-		return nil, fmt.Errorf("apply fingerprint to initial page: %w", err)
-	}
 
 	// Browser-level auto-attach pauses every future page or worker. The event
 	// loop configures the attached session directly, then releases it. This is
@@ -170,11 +164,19 @@ func (controller *Controller) Attach(ctx context.Context, profileID, websocketUR
 		session.Close()
 		return nil, fmt.Errorf("enable browser-wide pre-navigation protection: %w", err)
 	}
+	if err := session.applyProtection(operationContext, attached.SessionID, "page", false); err != nil {
+		session.Close()
+		return nil, fmt.Errorf("apply fingerprint to initial page: %w", err)
+	}
 	if initialURL != "" && initialURL != "about:blank" {
 		if err := client.Call(operationContext, attached.SessionID, "Page.navigate", map[string]any{"url": initialURL}, nil); err != nil {
 			session.Close()
 			return nil, fmt.Errorf("restore protected page: %w", err)
 		}
+	}
+	if err := controller.store.MarkVerified(operationContext, profileID, identity.BrowserVersion); err != nil {
+		session.Close()
+		return nil, fmt.Errorf("persist fingerprint verification: %w", err)
 	}
 
 	failed = false
@@ -411,4 +413,9 @@ func (recorder *navigationRecorder) close() {
 func restorableURL(rawURL string) bool {
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	return err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != ""
+}
+
+func initialURLAllowed(rawURL string) bool {
+	rawURL = strings.TrimSpace(rawURL)
+	return rawURL == "" || rawURL == "about:blank" || rawURL == "chrome://newtab/" || restorableURL(rawURL)
 }

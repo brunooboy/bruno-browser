@@ -21,7 +21,7 @@ func TestSnapshotUsesRecordedEventsAndRealProfileState(t *testing.T) {
 	}
 	snapshot, err := service.Snapshot(context.Background(), []ProfileState{{
 		ID: "profile-1", CreatedAt: now.Add(-24 * time.Hour), LaunchCount: 1,
-		Running: true, Engine: "wayfern", FingerprintReady: true, ProxyConfigured: true,
+		Running: true, Engine: "bruno", FingerprintReady: true, ProxyConfigured: true,
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -29,7 +29,7 @@ func TestSnapshotUsesRecordedEventsAndRealProfileState(t *testing.T) {
 	if snapshot.Summary.RunningProfiles != 1 || snapshot.Summary.SuccessfulLaunches24h != 1 || snapshot.Summary.MedianProxyLatencyMs != 42 {
 		t.Fatalf("unexpected summary: %#v", snapshot.Summary)
 	}
-	if snapshot.Signals.Fingerprint != 100 || snapshot.Profiles[0].Risk != "low" || snapshot.Profiles[0].FingerprintLabel != "Wayfern nativo verificado" {
+	if snapshot.Signals.Fingerprint != 100 || snapshot.Profiles[0].Risk != "low" || snapshot.Profiles[0].FingerprintLabel != "Bruno CDP verificado" {
 		t.Fatalf("unexpected signals/profile metrics: %#v %#v", snapshot.Signals, snapshot.Profiles)
 	}
 }
@@ -44,7 +44,7 @@ func TestTelemetryKeepsFailureAsAttentionSignal(t *testing.T) {
 	if err := service.RecordLaunch(context.Background(), "profile-1", false); err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := service.Snapshot(context.Background(), []ProfileState{{ID: "profile-1", CreatedAt: now, Engine: "wayfern"}})
+	snapshot, err := service.Snapshot(context.Background(), []ProfileState{{ID: "profile-1", CreatedAt: now, Engine: "bruno"}})
 	if err != nil {
 		t.Fatal(err)
 	}

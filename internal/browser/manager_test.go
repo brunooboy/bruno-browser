@@ -188,12 +188,9 @@ func TestBrowserHelperProcess(t *testing.T) {
 	time.Sleep(350 * time.Millisecond)
 }
 
-func TestWayfernUsesCleanNewTabWhenProfileHasNoPage(t *testing.T) {
-	if actual := neutralControlledStartURL(true); actual != wayfernNewTabURL {
-		t.Fatalf("unexpected Wayfern neutral page: %q", actual)
-	}
-	if actual := neutralControlledStartURL(false); actual != "about:blank" {
-		t.Fatalf("unexpected Chromium neutral page: %q", actual)
+func TestBrunoEngineUsesProtectedNewTabWhenProfileHasNoPage(t *testing.T) {
+	if actual := neutralControlledStartURL(); actual != brunoNewTabURL {
+		t.Fatalf("unexpected Bruno Engine neutral page: %q", actual)
 	}
 }
 

@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -63,7 +62,8 @@ func TestLiveChromiumFingerprintIsAppliedBeforeNavigation(t *testing.T) {
 	arguments, err := BuildArguments(LaunchOptions{
 		UserDataDir: paths.UserData, StartURL: "about:blank", RemoteDebugging: true,
 		ExtraArguments: []string{
-			"--headless=new", "--disable-gpu", "--disable-search-engine-choice-screen", "--disable-breakpad", "--disable-crash-reporter",
+			"--headless=new", "--disable-gpu", "--disable-software-rasterizer", "--no-sandbox",
+			"--disable-search-engine-choice-screen", "--disable-breakpad", "--disable-crash-reporter",
 		},
 	})
 	if err != nil {
@@ -238,16 +238,15 @@ func TestLiveChromiumFingerprintIsAppliedBeforeNavigation(t *testing.T) {
 }
 
 func findStockChromiumForIntegration() (string, error) {
-	for _, name := range executableNames(runtime.GOOS) {
-		path, err := exec.LookPath(name)
-		if err == nil && !supportsWayfernProfileIdentity(path) {
-			return filepath.Abs(path)
-		}
+	if executable, err := FindExecutable(""); err == nil {
+		return executable, nil
 	}
-	for _, candidate := range executableCandidates(runtime.GOOS) {
-		path, err := validateExecutablePath(candidate)
-		if err == nil && !supportsWayfernProfileIdentity(path) {
-			return path, nil
+	for _, candidate := range []string{
+		filepath.Join("..", "..", "build", "bin", "engine", "chrome-win", "chrome.exe"),
+		filepath.Join("build", "bin", "engine", "chrome-win", "chrome.exe"),
+	} {
+		if executable, err := validateBrunoEnginePath(candidate); err == nil {
+			return executable, nil
 		}
 	}
 	return "", ErrBrowserNotFound
