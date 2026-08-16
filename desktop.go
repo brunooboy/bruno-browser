@@ -9,6 +9,7 @@ import (
 
 	"bruno-browser/internal/account"
 	appcore "bruno-browser/internal/app"
+	"bruno-browser/internal/backups"
 	"bruno-browser/internal/browser"
 	"bruno-browser/internal/diagnostics"
 	"bruno-browser/internal/domain"
@@ -44,6 +45,7 @@ type BootstrapState struct {
 	SettingsPath    string                  `json:"settingsPath"`
 	Telemetry       telemetry.Snapshot      `json:"telemetry"`
 	Diagnostics     diagnostics.Report      `json:"diagnostics"`
+	Backups         []backups.HistoryEntry  `json:"backups"`
 }
 
 type ProfileView struct {
@@ -147,12 +149,17 @@ func (d *Desktop) Bootstrap() (BootstrapState, error) {
 	if err != nil {
 		return BootstrapState{}, err
 	}
+	backupHistory, err := d.core.Backups.History(ctx)
+	if err != nil {
+		return BootstrapState{}, err
+	}
 	return BootstrapState{
 		Profiles: profiles, Account: user, Plan: plan, Preferences: prefs,
 		Updates: updateStatus, Extensions: extensionList,
 		OAuthConfigured: d.oauthConfigured, SettingsPath: d.settingsPath,
 		Telemetry:   telemetrySnapshot,
 		Diagnostics: diagnosticReport,
+		Backups:     backupHistory,
 	}, nil
 }
 
@@ -409,6 +416,47 @@ func (d *Desktop) ExportSupportReport() (result diagnostics.SupportExport, opera
 	}
 	defer func() { d.recordFailure("support_export", operationErr) }()
 	return d.core.Diagnostics.ExportSupportReport(d.context(), path)
+}
+
+func (d *Desktop) BackupHistory() ([]backups.HistoryEntry, error) {
+	return d.core.Backups.History(d.context())
+}
+
+func (d *Desktop) ExportProfiles(profileIDs []string, password string) (result backups.ExportResult, operationErr error) {
+	if err := d.requirePremium(); err != nil {
+		return backups.ExportResult{}, err
+	}
+	path, err := runtime.SaveFileDialog(d.context(), runtime.SaveDialogOptions{
+		Title:           "Exportar backup criptografado",
+		DefaultFilename: "Bruno-Backup-" + time.Now().Format("20060102-150405") + ".bruno-profile",
+		Filters:         []runtime.FileFilter{{DisplayName: "Perfil Bruno (*.bruno-profile)", Pattern: "*.bruno-profile"}},
+	})
+	if err != nil {
+		return backups.ExportResult{}, err
+	}
+	if strings.TrimSpace(path) == "" {
+		return backups.ExportResult{Cancelled: true}, nil
+	}
+	defer func() { d.recordFailure("backup_export", operationErr) }()
+	return d.core.Backups.Export(d.context(), profileIDs, path, password)
+}
+
+func (d *Desktop) ImportProfiles(password string) (result backups.ImportResult, operationErr error) {
+	if err := d.requirePremium(); err != nil {
+		return backups.ImportResult{}, err
+	}
+	path, err := runtime.OpenFileDialog(d.context(), runtime.OpenDialogOptions{
+		Title:   "Restaurar backup criptografado",
+		Filters: []runtime.FileFilter{{DisplayName: "Perfil Bruno (*.bruno-profile)", Pattern: "*.bruno-profile"}},
+	})
+	if err != nil {
+		return backups.ImportResult{}, err
+	}
+	if strings.TrimSpace(path) == "" {
+		return backups.ImportResult{Cancelled: true}, nil
+	}
+	defer func() { d.recordFailure("backup_import", operationErr) }()
+	return d.core.Backups.Import(d.context(), path, password)
 }
 
 func (d *Desktop) listProfiles(ctx context.Context) ([]ProfileView, error) {

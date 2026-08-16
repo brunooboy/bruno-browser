@@ -203,6 +203,20 @@ func load(path string) (Profile, error) {
 	return stored, nil
 }
 
+// RebindFile keeps a migrated fingerprint seed and characteristics while
+// assigning them to the destination profile UUID.
+func RebindFile(path, profileID string) error {
+	stored, err := load(path)
+	if err != nil {
+		return err
+	}
+	stored.ProfileID = strings.TrimSpace(profileID)
+	if err := stored.Validate(); err != nil {
+		return err
+	}
+	return storage.WriteJSONAtomic(path, stored, 0o600)
+}
+
 type localePreset struct {
 	locale, acceptLanguage, timezone string
 }

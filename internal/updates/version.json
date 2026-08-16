@@ -1,7 +1,12 @@
 {
-  "version": "1.4.0",
+  "version": "1.5.0",
   "publishedAt": "2026-08-16T00:00:00Z",
   "changelog": [
+    {
+      "version": "1.5.0",
+      "date": "2026-08-16",
+      "description": "Backup criptografado, restauração atômica e migração segura de perfis entre computadores."
+    },
     {
       "version": "1.4.0",
       "date": "2026-08-16",

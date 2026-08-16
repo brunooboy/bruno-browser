@@ -14,7 +14,7 @@
   "info": {
     "companyName": "Bruno Browser",
     "productName": "Bruno Browser",
-    "productVersion": "1.4.0",
+    "productVersion": "1.5.0",
     "copyright": "Copyright (c) 2026 Bruno Browser",
     "comments": "Local-first multi-profile Chromium workspace"
   },

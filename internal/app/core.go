@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"bruno-browser/internal/account"
+	"bruno-browser/internal/backups"
 	"bruno-browser/internal/browser"
 	"bruno-browser/internal/config"
 	"bruno-browser/internal/diagnostics"
@@ -34,6 +35,7 @@ type Core struct {
 	Updates     *updates.Service
 	Telemetry   *telemetry.Service
 	Diagnostics *diagnostics.Service
+	Backups     *backups.Service
 }
 
 func New(config config.Config) (*Core, error) {
@@ -103,6 +105,10 @@ func New(config config.Config) (*Core, error) {
 			return nil, fmt.Errorf("initialize bundled Bruno INSSIST extension: %w", err)
 		}
 	}
+	backupService, err := backups.New(config.DataRoot, profiles, browserManager, networkManager, extensionService)
+	if err != nil {
+		return nil, fmt.Errorf("initialize backup service: %w", err)
+	}
 	updateService, err := updates.New(config.UpdateURL, updates.WithDataRoot(config.DataRoot))
 	if err != nil {
 		return nil, fmt.Errorf("initialize update service: %w", err)
@@ -131,5 +137,6 @@ func New(config config.Config) (*Core, error) {
 		Updates:     updateService,
 		Telemetry:   telemetryService,
 		Diagnostics: diagnosticsService,
+		Backups:     backupService,
 	}, nil
 }

@@ -56,3 +56,15 @@ func WriteFileAtomic(path string, payload []byte, permission os.FileMode) (err e
 	}
 	return nil
 }
+
+// CommitFileAtomic replaces destination with a fully written temporary file.
+// Source and destination must live on the same volume.
+func CommitFileAtomic(source, destination string) error {
+	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
+		return fmt.Errorf("create destination directory: %w", err)
+	}
+	if err := replaceFile(source, destination); err != nil {
+		return fmt.Errorf("replace destination file: %w", err)
+	}
+	return syncDirectory(filepath.Dir(destination))
+}

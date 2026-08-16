@@ -249,6 +249,30 @@ func (s *Service) List(ctx context.Context) ([]Extension, error) {
 	return result, nil
 }
 
+// OriginalCRX returns the verified package kept in the local extension vault.
+// Backup code uses this package instead of copying an unpacked directory so
+// restoration always goes through the regular CRX validation pipeline.
+func (s *Service) OriginalCRX(ctx context.Context, extensionID string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	extension, err := s.load(extensionID)
+	if err != nil {
+		return "", err
+	}
+	path := filepath.Join(s.root, extension.ID, "original.crx")
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return "", errors.New("extension CRX is not a regular vault file")
+	}
+	return path, nil
+}
+
 func (s *Service) SetAssignments(ctx context.Context, extensionID string, profileIDs []string) (Extension, error) {
 	if err := ctx.Err(); err != nil {
 		return Extension{}, err

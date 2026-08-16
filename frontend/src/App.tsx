@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { invoke, isDesktop, onRuntimeEvent } from './bridge/desktop'
 import { AdminPage } from './components/admin/AdminPage'
+import { BackupsPage } from './components/backups/BackupsPage'
 import { ToastStack, type ToastMessage } from './components/common/Toast'
 import { ActivityChart } from './components/dashboard/ActivityChart'
 import { Sidebar } from './components/dashboard/Sidebar'
@@ -23,14 +24,15 @@ import { createProfileId, sortProfiles } from './lib/profile'
 import { loadNotifications, persistNotifications, prependNotification } from './lib/notifications'
 import { activePlan, onboardingProgress, onboardingStorageKey } from './lib/onboarding'
 import type { BrowserProfile, Platform, ProfileDraft, ProfileStatus, ProfileTag, ProxyDraft } from './types/profile'
-import type { AppNotification, BootstrapState, DashboardTelemetry, DiscordAccount, InstalledExtension, KeyClaims, KeyHistoryEntry, LicensePlan, NativeProfile, PlanStatus, SupportExport, SystemDiagnostics, UpdateDownloadResult, UpdateStatus } from './types/system'
+import type { AppNotification, BackupExportResult, BackupHistoryEntry, BackupImportResult, BootstrapState, DashboardTelemetry, DiscordAccount, InstalledExtension, KeyClaims, KeyHistoryEntry, LicensePlan, NativeProfile, PlanStatus, SupportExport, SystemDiagnostics, UpdateDownloadResult, UpdateStatus } from './types/system'
 
 let toastSequence = 0
 
 const fallbackUpdates: UpdateStatus = {
-  currentVersion: '1.4.0', latestVersion: '1.4.0', updateAvailable: false, installAvailable: false,
+  currentVersion: '1.5.0', latestVersion: '1.5.0', updateAvailable: false, installAvailable: false,
   checkedAt: new Date().toISOString(), source: 'local',
   changelog: [
+    { version: '1.5.0', date: '2026-08-16', description: 'Backup criptografado, restauração atômica e migração segura de perfis entre computadores.' },
     { version: '1.4.0', date: '2026-08-16', description: 'Configuração inicial guiada, validação do primeiro uso e exportação anônima de diagnóstico para suporte.' },
     { version: '1.3.0', date: '2026-08-16', description: 'Diagnóstico integrado, registro local de falhas, recuperação automática de metadados e homologação dos fluxos críticos.' },
     { version: '1.2.0', date: '2026-08-16', description: 'Atualizador com SHA-256 e rollback, formulário de proxy estável e associação de extensões sincronizada com perfis recém-criados.' },
@@ -126,6 +128,7 @@ export default function App() {
   const [keyHistory, setKeyHistory] = useState<KeyHistoryEntry[]>([])
   const [telemetry, setTelemetry] = useState<DashboardTelemetry>(emptyTelemetry)
   const [diagnostics, setDiagnostics] = useState<SystemDiagnostics>(emptyDiagnostics)
+	const [backups, setBackups] = useState<BackupHistoryEntry[]>([])
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [notifications, setNotifications] = useState<AppNotification[]>(() => loadNotifications(localStorage))
   const [coreOnline, setCoreOnline] = useState(false)
@@ -166,6 +169,7 @@ export default function App() {
     setSettingsPath(state.settingsPath)
     setTelemetry(state.telemetry)
     setDiagnostics(state.diagnostics)
+		setBackups(state.backups)
   }
 
   useEffect(() => {
@@ -410,6 +414,36 @@ export default function App() {
     } catch (error) { notify(errorText(error), 'warning') } finally { setBusy(false) }
   }
 
+	const handleExportProfiles = async (profileIds: string[], password: string) => {
+		if (!desktopMode) { notify('O backup real exige o aplicativo desktop.', 'info'); return }
+		setBusy(true)
+		try {
+			const result = await invoke<BackupExportResult>('ExportProfiles', profileIds, password)
+			if (result.cancelled) return
+			setBackups((current) => [result.history, ...current].slice(0, 100))
+			notify(`${result.profiles ?? profileIds.length} perfil(is) exportado(s) com criptografia.`)
+		} catch (error) { notify(errorText(error), 'warning') } finally { setBusy(false) }
+	}
+
+	const handleImportProfiles = async (password: string) => {
+		if (!desktopMode) { notify('A restauração real exige o aplicativo desktop.', 'info'); return undefined }
+		setBusy(true)
+		profileSyncRevision.current += 1
+		try {
+			const result = await invoke<BackupImportResult>('ImportProfiles', password)
+			if (result.cancelled) return result
+			const [refreshedProfiles, refreshedExtensions] = await Promise.all([
+				invoke<NativeProfile[]>('ListProfiles'), invoke<InstalledExtension[]>('ListExtensions'),
+			])
+			setProfiles(refreshedProfiles.map(toBrowserProfile))
+			setExtensions(refreshedExtensions)
+			setBackups((current) => [result.history, ...current].slice(0, 100))
+			refreshTelemetry()
+			notify(`${result.profiles.length} perfil(is) restaurado(s) no disco.`)
+			return result
+		} catch (error) { notify(errorText(error), 'warning'); return undefined } finally { profileSyncRevision.current += 1; setBusy(false) }
+	}
+
   const handleLogin = async () => {
     setBusy(true)
     try { const user = await invoke<DiscordAccount>('LoginDiscord'); setAccount(user); setPlan(await invoke<PlanStatus>('LicenseStatus')); notify(`Discord conectado como ${user.username}.`) }
@@ -460,6 +494,7 @@ export default function App() {
   const topbar = activeSection === 'proxies'
     ? { contextLabel: 'NETWORK OPERATIONS', title: 'Roteamento & DNS', statusLabel: coreOnline ? 'CONFIGURAÇÃO LOCAL' : 'NÚCLEO INDISPONÍVEL', actionLabel: 'Configurar rota', onCreate: () => openProxyModal(), onSearch: setSearch, searchPlaceholder: 'Buscar rota ou perfil...' }
     : activeSection === 'extensions' ? { contextLabel: 'EXTENSION OPERATIONS', title: 'Extensões', statusLabel: 'COFRE LOCAL' }
+		: activeSection === 'backups' ? { contextLabel: 'SECURE PROFILE VAULT', title: 'Backups', statusLabel: 'CRIPTOGRAFIA LOCAL' }
     : activeSection === 'updates' ? { contextLabel: 'SYSTEM RELEASES', title: 'Atualizações', statusLabel: 'CANAL ESTÁVEL' }
     : activeSection === 'settings' ? { contextLabel: 'LOCAL CONTROL', title: 'Configurações', statusLabel: desktopMode ? 'APP DESKTOP' : 'MODO PRÉVIA' }
     : activeSection === 'admin' ? { contextLabel: 'LICENSE CONTROL', title: 'Painel Admin', statusLabel: 'ACESSO RESTRITO' }
@@ -471,6 +506,7 @@ export default function App() {
       <TopBar {...topbar} notifications={notifications} onClearNotifications={() => setNotifications([])} onReadNotifications={() => setNotifications((current) => current.map((item) => ({ ...item, read: true })))} search={search} />
       {activeSection === 'proxies' ? <ProxyPage onConfigure={openProxyModal} onTest={handleTestProxy} premiumActive={premiumActive} profiles={profiles.filter((item) => !search.trim() || [item.name, item.id, item.proxy?.host ?? 'direto'].some((value) => value.toLowerCase().includes(search.toLowerCase())))} testingId={testingProxyId} />
       : activeSection === 'extensions' ? <ExtensionsPage busy={busy} desktopMode={desktopMode} extensions={extensions} onInstall={handleInstallExtension} onRemove={handleRemoveExtension} onSaveAssignments={handleAssignExtension} premiumActive={premiumActive} profiles={profiles} />
+		: activeSection === 'backups' ? <BackupsPage busy={busy} desktopMode={desktopMode} history={backups} onExport={handleExportProfiles} onImport={handleImportProfiles} premiumActive={premiumActive} profiles={profiles} />
       : activeSection === 'updates' ? <UpdatesPage busy={busy} desktopMode={desktopMode} onCheck={handleCheckUpdates} onInstall={handleInstallUpdate} status={updates} />
       : activeSection === 'settings' ? <SettingsPage account={account} busy={busy} desktopMode={desktopMode} diagnostics={diagnostics} oauthConfigured={oauthConfigured} onActivate={handleActivate} onClearDiagnostics={handleClearDiagnostics} onDeactivate={handleDeactivate} onExportSupport={handleExportSupport} onLogin={handleLogin} onLogout={handleLogout} onOpenOnboarding={() => setOnboardingOpen(true)} onRunDiagnostics={handleRunDiagnostics} onSaveTheme={handleSaveTheme} plan={plan} preferences={{ accentColor }} settingsPath={settingsPath} />
       : activeSection === 'admin' && account?.isAdmin ? <AdminPage busy={busy} history={keyHistory} onCopy={handleCopy} onGenerate={handleGenerateKey} onInspect={handleInspectKey} />
@@ -478,7 +514,7 @@ export default function App() {
         <StatsGrid telemetry={telemetry} /><ActivityChart telemetry={telemetry} />
         <ProfileFilters count={visibleProfiles.length} onManageTags={() => setTagModalOpen(true)} onPlatformChange={setPlatform} onSortChange={setSort} onStatusChange={setStatus} onViewChange={setView} platform={platform} sort={sort} status={status} view={view} />
         {visibleProfiles.length ? <section aria-label="Lista de perfis" className={`profiles-layout profiles-layout--${view}`}>{visibleProfiles.map((item) => <ProfileCard key={item.id} now={now} onAction={handleProfileAction} onLaunch={handleLaunch} premiumActive={premiumActive} profile={item} view={view} />)}</section> : <ProfileEmptyState onReset={resetFilters} />}
-        <footer className="dashboard-footer"><span>BRUNO BROWSER // LOCAL OPERATIONS TERMINAL</span><span><i /> DADOS DO PERFIL: DISCO LOCAL</span><span>BUILD 1.4.0</span></footer>
+        <footer className="dashboard-footer"><span>BRUNO BROWSER // LOCAL OPERATIONS TERMINAL</span><span><i /> DADOS DO PERFIL: DISCO LOCAL</span><span>BUILD 1.5.0</span></footer>
       </div>}
     </main>
     <ProfileModal onClose={() => { setProfileModalOpen(false); setEditingProfile(null) }} onManageTags={() => setTagModalOpen(true)} onSave={handleSaveProfile} open={profileModalOpen} profile={editingProfile} tags={tags} />

@@ -371,6 +371,77 @@ func (s *Store) Paths(id string) (Paths, error) {
 	return s.pathsForCanonicalID(canonicalID)
 }
 
+// CommitImport atomically promotes a fully validated staging directory into
+// the profile store. The staging directory must be a direct .restore-* child
+// of the profiles root, which prevents callers from moving arbitrary paths.
+// The original UUID is preserved when available; collisions receive a new
+// UUID so an import can never overwrite an existing profile.
+func (s *Store) CommitImport(ctx context.Context, source domain.Metadata, stagingRoot string, extensionPaths []string) (domain.Metadata, error) {
+	if err := ctx.Err(); err != nil {
+		return domain.Metadata{}, err
+	}
+	absoluteStaging, err := filepath.Abs(filepath.Clean(stagingRoot))
+	if err != nil {
+		return domain.Metadata{}, fmt.Errorf("normalize import staging directory: %w", err)
+	}
+	relative, err := filepath.Rel(s.root, absoluteStaging)
+	if err != nil || filepath.Dir(relative) != "." || !strings.HasPrefix(filepath.Base(relative), ".restore-") {
+		return domain.Metadata{}, errors.New("import staging directory must be a direct .restore-* child of the profiles root")
+	}
+	info, err := os.Lstat(absoluteStaging)
+	if err != nil {
+		return domain.Metadata{}, fmt.Errorf("inspect import staging directory: %w", err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return domain.Metadata{}, errors.New("import staging path must be a real directory")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	targetID, err := canonicalProfileID(source.ID)
+	if err != nil {
+		targetID = uuid.NewString()
+	}
+	destination := filepath.Join(s.root, targetID)
+	if _, err := os.Lstat(destination); err == nil {
+		targetID = uuid.NewString()
+		destination = filepath.Join(s.root, targetID)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return domain.Metadata{}, fmt.Errorf("inspect import destination: %w", err)
+	}
+
+	metadata := source.Clone()
+	metadata.SchemaVersion = domain.CurrentMetadataVersion
+	metadata.ID = targetID
+	metadata.ExtensionPaths = slices.Clone(extensionPaths)
+	if metadata.CreatedAt.IsZero() {
+		metadata.CreatedAt = s.clock().UTC()
+	}
+	if metadata.UpdatedAt.IsZero() || metadata.UpdatedAt.Before(metadata.CreatedAt) {
+		metadata.UpdatedAt = metadata.CreatedAt
+	}
+	if err := normalizeMetadata(&metadata); err != nil {
+		return domain.Metadata{}, err
+	}
+	if err := metadata.Validate(); err != nil {
+		return domain.Metadata{}, fmt.Errorf("validate imported profile: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(absoluteStaging, userDataDirName), 0o700); err != nil {
+		return domain.Metadata{}, fmt.Errorf("create imported Chromium directory: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(absoluteStaging, "extensions"), 0o700); err != nil {
+		return domain.Metadata{}, fmt.Errorf("create imported extension directory: %w", err)
+	}
+	if err := s.writeMetadata(filepath.Join(absoluteStaging, metadataFileName), metadata); err != nil {
+		return domain.Metadata{}, err
+	}
+	if err := os.Rename(absoluteStaging, destination); err != nil {
+		return domain.Metadata{}, fmt.Errorf("commit imported profile: %w", err)
+	}
+	return metadata.Clone(), nil
+}
+
 func (s *Store) pathsForCanonicalID(id string) (Paths, error) {
 	root := filepath.Join(s.root, id)
 	relative, err := filepath.Rel(s.root, root)

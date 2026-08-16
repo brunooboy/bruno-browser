@@ -19,7 +19,7 @@ func TestCoreWiresProfilesNetworkBrowserAndMaintenance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if core.Profiles == nil || core.Network == nil || core.Browser == nil || core.Maintenance == nil || core.Fingerprint == nil || core.Diagnostics == nil {
+	if core.Profiles == nil || core.Network == nil || core.Browser == nil || core.Maintenance == nil || core.Fingerprint == nil || core.Diagnostics == nil || core.Backups == nil {
 		t.Fatalf("core services are incomplete: %#v", core)
 	}
 	metadata, err := core.Profiles.Create(context.Background(), profile.Fields{

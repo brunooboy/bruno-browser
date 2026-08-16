@@ -4,7 +4,7 @@
 
 Navegador de perfis local-first para Windows, feito com Go, Wails, React e TypeScript. Cada perfil usa um diretório físico próprio do Chromium, preservando cookies, sessões e armazenamento local no disco.
 
-> Versão atual: **1.4.0** · Windows 10/11 · x64 e ARM64
+> Versão atual: **1.5.0** · Windows 10/11 · x64 e ARM64
 
 ## Instalação
 
@@ -33,6 +33,7 @@ O pacote atual ainda não possui assinatura Authenticode. Por isso, o Microsoft 
 - Changelog e verificação de atualização por manifesto JSON.
 - Tema e central de notificações persistentes.
 - Diagnóstico integrado de engine, disco, perfis, rede, extensões, licença e atualizações, com registro local limitado de falhas.
+- Backup `.bruno-profile` com AES-256-GCM e scrypt, migração de sessões/fingerprint/proxy/extensões e restauração com rollback.
 - Guia de primeira execução ligado ao diagnóstico, login Discord, ativação do plano e criação do primeiro perfil.
 - Exportação manual de relatório anônimo para suporte, sem nomes de perfil, Discord ID, URLs, hosts ou credenciais.
 - Backup atômico de `metadata.json` e restauração automática do perfil quando o arquivo principal é interrompido ou corrompido.

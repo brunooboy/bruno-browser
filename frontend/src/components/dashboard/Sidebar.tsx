@@ -17,6 +17,7 @@ const primaryItems: { id: string; label: string; icon: IconName }[] = [
   { id: 'proxies', label: 'Proxies', icon: 'globe' },
   { id: 'tags', label: 'Tags', icon: 'tag' },
   { id: 'extensions', label: 'Extensões', icon: 'extensions' },
+	{ id: 'backups', label: 'Backups', icon: 'download' },
 ]
 
 export function Sidebar({ active, collapsed, desktopMode = false, isAdmin = false, onNavigate, onToggle, profileCount }: SidebarProps) {

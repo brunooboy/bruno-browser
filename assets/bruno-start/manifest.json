@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Bruno Start",
   "description": "Página inicial local do Bruno Engine.",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "icons": {
     "16": "icon.png",
     "32": "icon.png",

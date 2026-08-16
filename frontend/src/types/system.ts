@@ -186,6 +186,41 @@ export interface SupportExport {
   generatedAt: string
 }
 
+export interface BackupHistoryEntry {
+  id: string
+  operation: 'export' | 'import'
+  status: 'success' | 'failed'
+  archivePath: string
+  bytes: number
+  profileCount: number
+  profileNames?: string[]
+  message?: string
+  createdAt: string
+}
+
+export interface BackupExportResult {
+  cancelled: boolean
+  path?: string
+  bytes?: number
+  profiles?: number
+  history: BackupHistoryEntry
+}
+
+export interface BackupImportedProfile {
+  sourceId: string
+  id: string
+  name: string
+  rekeyed: boolean
+}
+
+export interface BackupImportResult {
+  cancelled: boolean
+  path?: string
+  bytes?: number
+  profiles: BackupImportedProfile[]
+  history: BackupHistoryEntry
+}
+
 export interface BootstrapState {
   profiles: NativeProfile[]
   account?: DiscordAccount
@@ -197,6 +232,7 @@ export interface BootstrapState {
   settingsPath: string
   telemetry: DashboardTelemetry
   diagnostics: SystemDiagnostics
+	backups: BackupHistoryEntry[]
 }
 
 export interface KeyClaims {

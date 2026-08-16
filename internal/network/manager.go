@@ -30,6 +30,13 @@ func (m *Manager) Get(ctx context.Context, profileID string) (Settings, error) {
 	return m.store.Get(ctx, profileID)
 }
 
+// RuntimeSettingsForBackup returns a short-lived plaintext copy of the proxy
+// password so it can be placed inside an already encrypted backup payload.
+// Callers must not persist the returned password anywhere else.
+func (m *Manager) RuntimeSettingsForBackup(ctx context.Context, profileID string) (RuntimeSettings, error) {
+	return m.store.Resolve(ctx, profileID)
+}
+
 func (m *Manager) Save(ctx context.Context, profileID string, input SaveInput) (Settings, error) {
 	// Runtime proxy bridges resolve an immutable copy of the settings during
 	// profile launch. Persisting a new route is therefore safe while a browser
