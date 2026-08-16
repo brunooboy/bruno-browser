@@ -13,16 +13,27 @@ const CurrentSchemaVersion = 1
 
 type Mode string
 
+type DNSPreset string
+
 const (
 	ModeDirect Mode = "direct"
 	ModeHTTP   Mode = "http"
 	ModeSOCKS5 Mode = "socks5"
 )
 
+const (
+	DNSLight   DNSPreset = "light"
+	DNSNormal  DNSPreset = "normal"
+	DNSHigh    DNSPreset = "high"
+	DNSPro     DNSPreset = "pro"
+	DNSProPlus DNSPreset = "pro_plus"
+)
+
 type Settings struct {
 	SchemaVersion int       `json:"schemaVersion"`
 	ProfileID     string    `json:"profileId"`
 	Mode          Mode      `json:"mode"`
+	DNSPreset     DNSPreset `json:"dnsPreset"`
 	Host          string    `json:"host,omitempty"`
 	Port          uint16    `json:"port,omitempty"`
 	Username      string    `json:"username,omitempty"`
@@ -32,13 +43,14 @@ type Settings struct {
 }
 
 type SaveInput struct {
-	Mode          Mode     `json:"mode"`
-	Host          string   `json:"host,omitempty"`
-	Port          uint16   `json:"port,omitempty"`
-	Username      string   `json:"username,omitempty"`
-	Password      string   `json:"password,omitempty"`
-	ClearPassword bool     `json:"clearPassword"`
-	BypassList    []string `json:"bypassList,omitempty"`
+	Mode          Mode      `json:"mode"`
+	DNSPreset     DNSPreset `json:"dnsPreset"`
+	Host          string    `json:"host,omitempty"`
+	Port          uint16    `json:"port,omitempty"`
+	Username      string    `json:"username,omitempty"`
+	Password      string    `json:"password,omitempty"`
+	ClearPassword bool      `json:"clearPassword"`
+	BypassList    []string  `json:"bypassList,omitempty"`
 }
 
 type RuntimeSettings struct {
@@ -59,15 +71,34 @@ func (mode Mode) Valid() bool {
 	return mode == ModeDirect || mode == ModeHTTP || mode == ModeSOCKS5
 }
 
+func (preset DNSPreset) Valid() bool {
+	return preset == DNSLight || preset == DNSNormal || preset == DNSHigh || preset == DNSPro || preset == DNSProPlus
+}
+
+func normalizeDNSPreset(preset DNSPreset) (DNSPreset, error) {
+	if preset == "" {
+		return DNSNormal, nil
+	}
+	if !preset.Valid() {
+		return "", fmt.Errorf("unsupported DNS preset %q", preset)
+	}
+	return preset, nil
+}
+
 func normalizeInput(input SaveInput) (SaveInput, error) {
 	input.Host = strings.TrimSpace(strings.Trim(input.Host, "[]"))
 	input.Username = strings.TrimSpace(input.Username)
 	input.BypassList = normalizeBypassList(input.BypassList)
+	var err error
+	input.DNSPreset, err = normalizeDNSPreset(input.DNSPreset)
+	if err != nil {
+		return SaveInput{}, err
+	}
 	if !input.Mode.Valid() {
 		return SaveInput{}, fmt.Errorf("unsupported network mode %q", input.Mode)
 	}
 	if input.Mode == ModeDirect {
-		return SaveInput{Mode: ModeDirect, ClearPassword: true}, nil
+		return SaveInput{Mode: ModeDirect, DNSPreset: input.DNSPreset, ClearPassword: true}, nil
 	}
 	if err := validateHost(input.Host); err != nil {
 		return SaveInput{}, err

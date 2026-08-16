@@ -82,7 +82,7 @@ func TestStoreDefaultsToDirectAndDirectClearsProxy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if settings.Mode != ModeDirect || settings.HasPassword {
+	if settings.Mode != ModeDirect || settings.DNSPreset != DNSNormal || settings.HasPassword {
 		t.Fatalf("unexpected defaults: %#v", settings)
 	}
 	if _, err := store.Save(context.Background(), metadata.ID, SaveInput{
@@ -90,11 +90,11 @@ func TestStoreDefaultsToDirectAndDirectClearsProxy(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	settings, err = store.Save(context.Background(), metadata.ID, SaveInput{Mode: ModeDirect})
+	settings, err = store.Save(context.Background(), metadata.ID, SaveInput{Mode: ModeDirect, DNSPreset: DNSPro})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if settings.Mode != ModeDirect || settings.Host != "" || settings.HasPassword {
+	if settings.Mode != ModeDirect || settings.DNSPreset != DNSPro || settings.Host != "" || settings.HasPassword {
 		t.Fatalf("direct mode retained proxy data: %#v", settings)
 	}
 }

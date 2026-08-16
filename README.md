@@ -4,7 +4,7 @@
 
 Navegador de perfis local-first para Windows, feito com Go, Wails, React e TypeScript. Cada perfil usa um diretório físico próprio do Chromium, preservando cookies, sessões e armazenamento local no disco.
 
-> Versão atual: **1.0.0** · Windows 10/11 · x64 e ARM64
+> Versão atual: **1.1.0** · Windows 10/11 · x64 e ARM64
 
 ## Instalação
 
@@ -21,9 +21,12 @@ O pacote atual ainda não possui assinatura Authenticode. Por isso, o Microsoft 
 - Perfis persistentes com `--user-data-dir` exclusivo e restauração de sessão.
 - Metadados, plataformas, tags, notas e maturidade por perfil.
 - Bruno Engine integrado, com ícone e página inicial próprios, iniciado em uma janela separada por perfil.
-- Fingerprint persistente e exclusivo por perfil, aplicado e verificado por CDP antes da navegação.
+- Fingerprint persistente por perfil, alinhado ao idioma, fuso, plataforma, hardware e GPU realmente expostos pelo Bruno Engine antes da navegação.
+- DuckDuckGo inicializado como busca padrão, preservando uma escolha posterior feita manualmente pelo usuário.
+- Tema escuro do navegador e renderização escura forçada para conteúdo web.
 - Proxy HTTP/SOCKS5 por perfil, DNS pelo proxy e proteção contra vazamento WebRTC.
-- Cofre de extensões CRX com associação posterior a um ou vários perfis.
+- Cinco políticas DNS por perfil: Leve, Normal (Cloudflare), Alto (Quad9), Pro (AdGuard) e Pro+ (AdGuard Family).
+- Cofre de extensões CRX com associação posterior a um ou vários perfis, incluindo o Bruno INSSIST nativo como opção não atribuída por padrão.
 - Limpeza seletiva de cache/histórico, cookies/sessão e exclusão de perfil.
 - Login Discord OAuth2 Public Client com PKCE e callback local, sem secret no aplicativo.
 - Licenças locais AES-256-GCM, planos de 1, 7 e 30 dias ou vitalício.
@@ -70,6 +73,12 @@ O usuário comum não precisa criar `config.json` ou editar `appconfig.json`. O 
 ## Extensões CRX
 
 O botão **Instalar CRX** abre o seletor nativo. O backend valida CRX2/CRX3, extrai o conteúdo com proteção contra caminhos maliciosos e confere o `manifest.json`. A extensão entra primeiro no cofre global; depois o usuário escolhe em quais perfis ela será carregada. Alterações passam a valer na próxima abertura do perfil.
+
+O instalador inclui `Bruno-INSSIST.crx`, validado pelo SHA-256 `1199419B25F78202D0C3CB8828FFCF3CDBB92C8E9C7059B6043F4078EE9070AD`. Na primeira execução ele aparece como **Nativa Bruno**, mas não é ativado em perfil algum até o usuário escolher. Se for desinstalado, o app respeita a decisão e não o reinstala silenciosamente.
+
+## DNS e desafios de segurança
+
+Os presets configuram provedores DoH reais e filtros progressivos. Eles protegem a resolução de nomes, mas não alteram o IP público e não constituem mecanismo de contorno de CAPTCHA. A versão 1.1.0 também remove combinações sorteadas de idioma, fuso, hardware e GPU em runtime; cada perfil passa a usar uma leitura coerente do ambiente real com sua semente local estável. Serviços ainda podem solicitar verificações conforme reputação do IP, comportamento, cookies e estado da conta.
 
 ## Atualizações
 

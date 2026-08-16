@@ -57,6 +57,7 @@ type ProfileView struct {
 	StartURL         string               `json:"startUrl"`
 	LastURL          string               `json:"lastUrl"`
 	ExtensionPaths   []string             `json:"extensionPaths"`
+	DNSPreset        network.DNSPreset    `json:"dnsPreset"`
 	Proxy            *ProxyView           `json:"proxy"`
 	Running          bool                 `json:"running"`
 	Engine           string               `json:"engine"`
@@ -383,7 +384,7 @@ func (d *Desktop) profileView(ctx context.Context, metadata domain.Metadata) (Pr
 		LastLaunchedAt: metadata.LastLaunchedAt, LaunchCount: metadata.LaunchCount,
 		Platforms: metadata.Platforms, Status: metadata.Status, Tags: metadata.Tags,
 		Notes: metadata.Notes, StartURL: metadata.StartURL, LastURL: metadata.LastURL,
-		ExtensionPaths: metadata.ExtensionPaths, Proxy: proxyView,
+		ExtensionPaths: metadata.ExtensionPaths, DNSPreset: settings.DNSPreset, Proxy: proxyView,
 		Running: d.core.Browser.IsRunning(metadata.ID),
 		Engine:  d.core.Browser.Engine(), Risk: "medium", RiskReasons: []string{},
 	}, nil

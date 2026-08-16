@@ -167,6 +167,17 @@ function Copy-BrunoStartExtension {
     Copy-Item -LiteralPath (Join-Path $brunoWorkspace 'scripts\engine-manifest.json') -Destination (Join-Path $EngineDestination 'manifest.json') -Force
 }
 
+function Copy-BrunoNativeExtensions {
+    param([Parameter(Mandatory = $true)][string]$ApplicationDestination)
+    $brunoNativeSource = Join-Path $brunoWorkspace 'assets\native-extensions'
+    $brunoNativeDestination = Join-Path $ApplicationDestination 'native-extensions'
+    if (Test-Path -LiteralPath $brunoNativeDestination) {
+        Remove-Item -LiteralPath $brunoNativeDestination -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $brunoNativeDestination | Out-Null
+    Copy-Item -Path (Join-Path $brunoNativeSource '*') -Destination $brunoNativeDestination -Recurse -Force
+}
+
 $brunoEngineManifestPath = Join-Path $brunoWorkspace 'scripts\engine-manifest.json'
 $brunoEngineManifest = Get-Content -LiteralPath $brunoEngineManifestPath -Raw | ConvertFrom-Json
 $brunoEngineAmd64 = Get-BrunoEnginePlatform -Architecture 'amd64' -Definition $brunoEngineManifest.platforms.amd64
@@ -200,6 +211,7 @@ if ($Direct) {
     New-Item -ItemType Directory -Force -Path $brunoDirectEngine | Out-Null
     Copy-Item -LiteralPath (Join-Path $brunoEngineAmd64 'chrome-win') -Destination $brunoDirectEngine -Recurse -Force
     Copy-BrunoStartExtension -EngineDestination $brunoDirectEngine
+    Copy-BrunoNativeExtensions -ApplicationDestination $brunoOutputDirectory
     Write-Host "Aplicativo gerado em $brunoOutputDirectory\Bruno Browser.exe"
     exit 0
 }
@@ -230,6 +242,7 @@ if (Test-Path -LiteralPath $brunoLocalEngine) {
 New-Item -ItemType Directory -Force -Path $brunoLocalEngine | Out-Null
 Copy-Item -LiteralPath (Join-Path $brunoEngineAmd64 'chrome-win') -Destination $brunoLocalEngine -Recurse -Force
 Copy-BrunoStartExtension -EngineDestination $brunoLocalEngine
+Copy-BrunoNativeExtensions -ApplicationDestination (Join-Path $brunoWorkspace 'build\bin')
 
 if (-not $NoInstaller) {
     foreach ($brunoPortable in @(
@@ -245,6 +258,7 @@ if (-not $NoInstaller) {
         Copy-Item -LiteralPath $brunoPortable.Executable -Destination (Join-Path $brunoPortableRoot 'Bruno Browser.exe') -Force
         Copy-Item -LiteralPath (Join-Path $brunoPortable.Engine 'chrome-win') -Destination (Join-Path $brunoPortableRoot 'engine') -Recurse -Force
         Copy-BrunoStartExtension -EngineDestination (Join-Path $brunoPortableRoot 'engine')
+        Copy-BrunoNativeExtensions -ApplicationDestination $brunoPortableRoot
         Copy-Item -LiteralPath (Join-Path $brunoWorkspace 'docs\THIRD_PARTY_NOTICES.txt') -Destination $brunoPortableRoot -Force
         $brunoPortableArchive = Join-Path $brunoWorkspace "build\bin\Bruno-Browser-portable-$($brunoPortable.Architecture).zip"
         if (Test-Path -LiteralPath $brunoPortableArchive) {

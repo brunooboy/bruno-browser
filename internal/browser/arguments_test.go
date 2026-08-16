@@ -35,7 +35,10 @@ func TestBuildArgumentsAddsBrunoEngineSafetyFlags(t *testing.T) {
 		t.Fatalf("BuildArguments: %v", err)
 	}
 	joined := strings.Join(arguments, "\n")
-	for _, expected := range []string{"--disable-search-engine-choice-screen", "--disable-component-update"} {
+	for _, expected := range []string{
+		"--disable-search-engine-choice-screen", "--disable-component-update",
+		"--force-dark-mode", "--enable-features=WebContentsForceDark",
+	} {
 		if !strings.Contains(joined, expected) {
 			t.Errorf("missing %q in arguments: %v", expected, arguments)
 		}

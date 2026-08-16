@@ -42,7 +42,7 @@ func (m *Manager) Prepare(ctx context.Context, profileID, userDataDir string) (R
 	if err != nil {
 		return nil, err
 	}
-	if err := ApplyChromiumNetworkPreferences(userDataDir, settings.Mode != ModeDirect); err != nil {
+	if err := ApplyChromiumNetworkPreferences(userDataDir, settings.Mode != ModeDirect, settings.DNSPreset); err != nil {
 		return nil, err
 	}
 	if settings.Mode == ModeDirect {

@@ -25,10 +25,11 @@ import (
 )
 
 const (
-	metadataFileName = "metadata.json"
-	maxCRXSize       = 256 << 20
-	maxExpandedSize  = 768 << 20
-	maxEntries       = 20_000
+	metadataFileName     = "metadata.json"
+	bundledStateFileName = "bundled-state.json"
+	maxCRXSize           = 256 << 20
+	maxExpandedSize      = 768 << 20
+	maxEntries           = 20_000
 )
 
 type Extension struct {
@@ -40,6 +41,12 @@ type Extension struct {
 	InstalledAt        time.Time `json:"installedAt"`
 	Path               string    `json:"path"`
 	AssignedProfileIDs []string  `json:"assignedProfileIds"`
+	Bundled            bool      `json:"bundled"`
+}
+
+type bundledState struct {
+	SchemaVersion int                  `json:"schemaVersion"`
+	Processed     map[string]time.Time `json:"processed"`
 }
 
 type manifest struct {
@@ -141,6 +148,76 @@ func (s *Service) InstallCRX(ctx context.Context, sourcePath string) (Extension,
 	}
 	committed = true
 	return extension, nil
+}
+
+// EnsureBundled imports a packaged CRX exactly once. If the user later
+// uninstalls it, the processed marker remains and it is not silently restored.
+func (s *Service) EnsureBundled(ctx context.Context, sourcePath, expectedSHA256 string) (Extension, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return Extension{}, false, err
+	}
+	payload, err := readLimitedFile(sourcePath, maxCRXSize)
+	if err != nil {
+		return Extension{}, false, err
+	}
+	hash := sha256.Sum256(payload)
+	hashText := hex.EncodeToString(hash[:])
+	if !strings.EqualFold(strings.TrimSpace(expectedSHA256), hashText) {
+		return Extension{}, false, errors.New("bundled extension failed SHA-256 verification")
+	}
+
+	s.mu.Lock()
+	state, err := s.loadBundledState()
+	if err != nil {
+		s.mu.Unlock()
+		return Extension{}, false, err
+	}
+	_, processed := state.Processed[hashText]
+	s.mu.Unlock()
+	if processed {
+		return Extension{}, false, nil
+	}
+
+	extension, err := s.InstallCRX(ctx, sourcePath)
+	if err != nil {
+		return Extension{}, false, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	extension.Bundled = true
+	if err := storage.WriteJSONAtomic(filepath.Join(s.root, extension.ID, metadataFileName), extension, 0o600); err != nil {
+		return Extension{}, false, err
+	}
+	state, err = s.loadBundledState()
+	if err != nil {
+		return Extension{}, false, err
+	}
+	state.Processed[hashText] = s.clock().UTC()
+	if err := storage.WriteJSONAtomic(filepath.Join(s.root, bundledStateFileName), state, 0o600); err != nil {
+		return Extension{}, false, err
+	}
+	return extension, true, nil
+}
+
+func (s *Service) loadBundledState() (bundledState, error) {
+	payload, err := readLimitedFile(filepath.Join(s.root, bundledStateFileName), 1<<20)
+	if errors.Is(err, os.ErrNotExist) {
+		return bundledState{SchemaVersion: 1, Processed: make(map[string]time.Time)}, nil
+	}
+	if err != nil {
+		return bundledState{}, err
+	}
+	var state bundledState
+	if err := json.Unmarshal(payload, &state); err != nil {
+		return bundledState{}, fmt.Errorf("decode bundled extension state: %w", err)
+	}
+	if state.SchemaVersion != 1 {
+		return bundledState{}, fmt.Errorf("unsupported bundled extension state schema %d", state.SchemaVersion)
+	}
+	if state.Processed == nil {
+		state.Processed = make(map[string]time.Time)
+	}
+	return state, nil
 }
 
 func (s *Service) List(ctx context.Context) ([]Extension, error) {

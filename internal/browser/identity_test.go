@@ -2,6 +2,7 @@ package browser
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -50,6 +51,42 @@ func TestEnsureProfileIdentityCreatesAndPreservesProfileFiles(t *testing.T) {
 		if _, exists := blacklist[shortcutHash]; !exists {
 			t.Fatalf("Donut shortcut hash %s was not suppressed: %#v", shortcutHash, blacklist)
 		}
+	}
+	providerData := preferences["default_search_provider_data"].(map[string]any)
+	provider := providerData["template_url_data"].(map[string]any)
+	if provider["short_name"] != "DuckDuckGo" || provider["keyword"] != "duckduckgo.com" || provider["url"] != "https://duckduckgo.com/?q={searchTerms}" {
+		t.Fatalf("DuckDuckGo was not initialized as the default search provider: %#v", provider)
+	}
+	if fmt.Sprint(providerData["mirrored_template_url_data"]) != fmt.Sprint(providerData["template_url_data"]) {
+		t.Fatalf("default search mirror differs from its source: %#v", providerData)
+	}
+}
+
+func TestEnsureProfileIdentityDoesNotOverrideLaterSearchChoice(t *testing.T) {
+	userDataDir := t.TempDir()
+	if err := EnsureProfileIdentity(userDataDir, "Conta"); err != nil {
+		t.Fatal(err)
+	}
+	preferencesPath := filepath.Join(userDataDir, "Default", "Preferences")
+	preferences := readIdentityJSON(t, preferencesPath)
+	providerData := preferences["default_search_provider_data"].(map[string]any)
+	providerData["template_url_data"] = map[string]any{
+		"short_name": "Escolha do usuário", "keyword": "example.test", "url": "https://example.test/?q={searchTerms}",
+	}
+	payload, err := json.Marshal(preferences)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(preferencesPath, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureProfileIdentity(userDataDir, "Conta"); err != nil {
+		t.Fatal(err)
+	}
+	updated := readIdentityJSON(t, preferencesPath)
+	actual := updated["default_search_provider_data"].(map[string]any)["template_url_data"].(map[string]any)
+	if actual["short_name"] != "Escolha do usuário" {
+		t.Fatalf("a later user search choice was overwritten: %#v", actual)
 	}
 }
 

@@ -1,7 +1,12 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publishedAt": "2026-08-16T00:00:00Z",
   "changelog": [
+    {
+      "version": "1.1.0",
+      "date": "2026-08-16",
+      "description": "Perfis alinhados ao ambiente nativo, DuckDuckGo padrão, tema escuro forçado, cinco políticas DoH e extensão Bruno INSSIST opcional por perfil."
+    },
     {
       "version": "1.0.0",
       "date": "2026-08-16",

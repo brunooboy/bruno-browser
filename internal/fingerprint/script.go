@@ -3,6 +3,7 @@ package fingerprint
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type scriptConfig struct {
@@ -20,11 +21,14 @@ type scriptConfig struct {
 // Page.addScriptToEvaluateOnNewDocument before navigation and runs it in the
 // current about:blank document as well.
 func BuildScript(identity Identity) (string, error) {
-	languages := []string{identity.Locale}
-	if identity.Locale != "en-US" {
-		languages = append(languages, "en-US", "en")
-	} else {
-		languages = append(languages, "en")
+	languages := make([]string, 0, 4)
+	for _, entry := range strings.Split(identity.AcceptLanguage, ",") {
+		if language := strings.TrimSpace(strings.SplitN(entry, ";", 2)[0]); language != "" {
+			languages = append(languages, language)
+		}
+	}
+	if len(languages) == 0 {
+		languages = append(languages, identity.Locale)
 	}
 	configuration, err := json.Marshal(scriptConfig{
 		Seed: identity.Seed, Locale: identity.Locale, Languages: languages,

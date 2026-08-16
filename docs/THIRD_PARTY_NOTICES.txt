@@ -30,3 +30,9 @@ license. RCEdit is a build-time tool and is not included in the installer.
 
 Bruno Browser is not affiliated with Google, Chromium, Donut Browser or
 Wayfern. No Wayfern or Donut Browser binary is included in this distribution.
+
+The installer can include the user-supplied Bruno INSSIST extension package.
+It is optional per profile and communicates with Instagram and Inssist services.
+Its bundled third-party code and assets remain subject to their respective
+rights. The distributor is responsible for confirming redistribution rights
+before making a public release containing that CRX.

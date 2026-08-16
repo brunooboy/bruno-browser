@@ -1,4 +1,4 @@
-import type { Platform, ProfileStatus, ProfileTag, ProxyMode } from './profile'
+import type { DNSPreset, Platform, ProfileStatus, ProfileTag, ProxyMode } from './profile'
 
 export interface NativeProxy {
   mode: Exclude<ProxyMode, 'direct'>
@@ -26,6 +26,7 @@ export interface NativeProfile {
   startUrl: string
   lastUrl: string
   extensionPaths: string[]
+  dnsPreset: DNSPreset
   proxy: NativeProxy | null
   running: boolean
   engine: 'bruno' | 'chromium' | 'unavailable'
@@ -135,6 +136,7 @@ export interface InstalledExtension {
   installedAt: string
   path: string
   assignedProfileIds: string[]
+  bundled: boolean
 }
 
 export interface AppPreferences {

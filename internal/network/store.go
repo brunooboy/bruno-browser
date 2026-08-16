@@ -31,6 +31,7 @@ type networkRecord struct {
 	SchemaVersion     int       `json:"schemaVersion"`
 	ProfileID         string    `json:"profileId"`
 	Mode              Mode      `json:"mode"`
+	DNSPreset         DNSPreset `json:"dnsPreset"`
 	Host              string    `json:"host,omitempty"`
 	Port              uint16    `json:"port,omitempty"`
 	Username          string    `json:"username,omitempty"`
@@ -120,6 +121,7 @@ func (s *Store) Save(ctx context.Context, profileID string, input SaveInput) (Se
 		SchemaVersion: CurrentSchemaVersion,
 		ProfileID:     metadata.ID,
 		Mode:          normalized.Mode,
+		DNSPreset:     normalized.DNSPreset,
 		Host:          normalized.Host,
 		Port:          normalized.Port,
 		Username:      normalized.Username,
@@ -184,6 +186,7 @@ func (s *Store) loadRecord(path, profileID string) (networkRecord, error) {
 			SchemaVersion: CurrentSchemaVersion,
 			ProfileID:     profileID,
 			Mode:          ModeDirect,
+			DNSPreset:     DNSNormal,
 		}, nil
 	}
 	if err != nil {
@@ -209,6 +212,7 @@ func (s *Store) loadRecord(path, profileID string) (networkRecord, error) {
 	}
 	input, err := normalizeInput(SaveInput{
 		Mode:       record.Mode,
+		DNSPreset:  record.DNSPreset,
 		Host:       record.Host,
 		Port:       record.Port,
 		Username:   record.Username,
@@ -218,6 +222,7 @@ func (s *Store) loadRecord(path, profileID string) (networkRecord, error) {
 		return networkRecord{}, fmt.Errorf("validate network settings: %w", err)
 	}
 	record.Mode = input.Mode
+	record.DNSPreset = input.DNSPreset
 	record.Host = input.Host
 	record.Port = input.Port
 	record.Username = input.Username
@@ -230,6 +235,7 @@ func (record networkRecord) settings() Settings {
 		SchemaVersion: record.SchemaVersion,
 		ProfileID:     record.ProfileID,
 		Mode:          record.Mode,
+		DNSPreset:     record.DNSPreset,
 		Host:          record.Host,
 		Port:          record.Port,
 		Username:      record.Username,

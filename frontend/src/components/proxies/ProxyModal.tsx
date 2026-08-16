@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { BrowserProfile, ProxyDraft, ProxyMode } from '../../types/profile'
+import type { BrowserProfile, DNSPreset, ProxyDraft, ProxyMode } from '../../types/profile'
 import { Icon } from '../common/Icon'
 import { Modal } from '../common/Modal'
 import { PlatformIcon } from '../profiles/PlatformIcon'
@@ -13,8 +13,16 @@ interface ProxyModalProps {
 }
 
 const emptyDraft: ProxyDraft = {
-  profileId: '', mode: 'direct', host: '', port: '', username: '', password: '', clearPassword: false, bypassList: '',
+  profileId: '', mode: 'direct', dnsPreset: 'normal', host: '', port: '', username: '', password: '', clearPassword: false, bypassList: '',
 }
+
+const dnsPresets: { id: DNSPreset; label: string; provider: string; detail: string }[] = [
+  { id: 'light', label: 'LEVE', provider: 'Automático', detail: 'DoH quando disponível, com fallback do sistema' },
+  { id: 'normal', label: 'NORMAL', provider: 'Cloudflare', detail: 'DoH privado e sem filtro de conteúdo' },
+  { id: 'high', label: 'ALTO', provider: 'Quad9', detail: 'DoH com bloqueio de domínios maliciosos' },
+  { id: 'pro', label: 'PRO', provider: 'AdGuard', detail: 'Bloqueia anúncios, rastreadores e phishing' },
+  { id: 'pro_plus', label: 'PRO +', provider: 'AdGuard Family', detail: 'PRO com filtro adulto e busca segura' },
+]
 
 export function ProxyModal({ initialProfile, open, profiles, onClose, onSave }: ProxyModalProps) {
   const [draft, setDraft] = useState<ProxyDraft>(emptyDraft)
@@ -29,6 +37,7 @@ export function ProxyModal({ initialProfile, open, profiles, onClose, onSave }: 
     setDraft(selected ? {
       profileId: selected.id,
       mode: proxy?.mode ?? 'direct',
+      dnsPreset: selected.dnsPreset ?? 'normal',
       host: proxy?.host ?? '',
       port: proxy ? String(proxy.port) : '',
       username: proxy?.username ?? '',
@@ -44,6 +53,7 @@ export function ProxyModal({ initialProfile, open, profiles, onClose, onSave }: 
     setDraft({
       profileId,
       mode: proxy?.mode ?? 'direct',
+      dnsPreset: profile?.dnsPreset ?? 'normal',
       host: proxy?.host ?? '',
       port: proxy ? String(proxy.port) : '',
       username: proxy?.username ?? '',
@@ -111,8 +121,20 @@ export function ProxyModal({ initialProfile, open, profiles, onClose, onSave }: 
             </div>
           </section>
 
+          <section className="form-section">
+            <div className="form-section__heading"><span>03</span><div><h3>Nível de DNS</h3><p>Escolha uma política DoH real. DNS melhora privacidade e filtragem; não altera o IP público nem substitui proxy.</p></div></div>
+            <div className={`dns-preset-picker ${draft.mode !== 'direct' ? 'dns-preset-picker--disabled' : ''}`}>
+              {dnsPresets.map((preset) => (
+                <button className={draft.dnsPreset === preset.id ? 'active' : ''} disabled={draft.mode !== 'direct'} key={preset.id} onClick={() => setDraft((current) => ({ ...current, dnsPreset: preset.id }))} type="button">
+                  <span>{preset.label}</span><strong>{preset.provider}</strong><small>{preset.detail}</small><i><Icon name="check" size={11} /></i>
+                </button>
+              ))}
+            </div>
+            {draft.mode !== 'direct' && <p className="dns-proxy-notice"><Icon name="shield" size={14} /> Com proxy, a resolução local fica desligada e os domínios seguem pela rota remota. O nível escolhido fica salvo para quando o perfil voltar ao modo direto.</p>}
+          </section>
+
           {draft.mode !== 'direct' ? <section className="form-section">
-            <div className="form-section__heading"><span>03</span><div><h3>Endpoint e autenticação</h3><p>A senha será cifrada e nunca aparecerá nas flags do Chromium.</p></div></div>
+            <div className="form-section__heading"><span>04</span><div><h3>Endpoint e autenticação</h3><p>A senha será cifrada e nunca aparecerá nas flags do Chromium.</p></div></div>
             <div className="proxy-endpoint-fields">
               <label className="field-control"><span>Host ou IP</span><input onChange={(event) => setDraft((current) => ({ ...current, host: event.target.value }))} placeholder="proxy.example.com" value={draft.host} /></label>
               <label className="field-control"><span>Porta</span><input inputMode="numeric" onChange={(event) => setDraft((current) => ({ ...current, port: event.target.value.replace(/\D/g, '') }))} placeholder={draft.mode === 'socks5' ? '1080' : '8080'} value={draft.port} /></label>
@@ -128,7 +150,7 @@ export function ProxyModal({ initialProfile, open, profiles, onClose, onSave }: 
             </label>
           </section> : <section className="direct-dns-card">
             <Icon name="globe" size={25} />
-            <div><span>CONEXÃO DIRETA PROTEGIDA</span><strong>DNS automático pronto para uso</strong><p>DoH redundante é usado quando disponível, com fallback do sistema para não interromper o acesso. O WebRTC permanece impedido de usar rotas UDP paralelas.</p></div>
+            <div><span>CONEXÃO DIRETA PROTEGIDA</span><strong>{dnsPresets.find((preset) => preset.id === draft.dnsPreset)?.provider} ativo</strong><p>{dnsPresets.find((preset) => preset.id === draft.dnsPreset)?.detail}. O WebRTC permanece impedido de usar rotas UDP paralelas.</p></div>
           </section>}
         </div>
 
@@ -136,7 +158,7 @@ export function ProxyModal({ initialProfile, open, profiles, onClose, onSave }: 
           <span>NETWORK GUARD</span>
           <h3>Políticas aplicadas</h3>
           <div><Icon name="shield" size={17} /><span><strong>WebRTC LOCK</strong><small>UDP fora da rota bloqueado</small></span><i /></div>
-          <div><Icon name="globe" size={17} /><span><strong>{draft.mode === 'direct' ? 'DNS AUTO DoH' : 'DNS REMOTO'}</strong><small>{draft.mode === 'direct' ? 'Redundância + fallback' : 'Pré-resolução local bloqueada'}</small></span><i /></div>
+          <div><Icon name="globe" size={17} /><span><strong>{draft.mode === 'direct' ? `DNS ${draft.dnsPreset.replace('_', ' ').toUpperCase()}` : 'DNS REMOTO'}</strong><small>{draft.mode === 'direct' ? 'Política DoH por perfil' : 'Pré-resolução local bloqueada'}</small></span><i /></div>
           <div><Icon name="network" size={17} /><span><strong>SEM DIRECT FALLBACK</strong><small>Falha fechada quando há proxy</small></span><i /></div>
           <div><Icon name="shield" size={17} /><span><strong>CREDENCIAL CIFRADA</strong><small>Fora das flags e metadados</small></span><i /></div>
           <p>Você pode salvar a rota a qualquer momento. Se o perfil estiver aberto, ela será aplicada automaticamente na próxima abertura.</p>

@@ -31,10 +31,16 @@ func BuildIdentity(profile Profile, product, nativeUserAgent string) (Identity, 
 	}
 
 	return Identity{
-		Profile: profile, UserAgent: userAgentFor(profile, version),
+		Profile: profile, UserAgent: normalizeNativeUserAgent(nativeUserAgent),
 		BrowserVersion: version, BrowserMajor: major,
 		PrimaryBrand: brand, PrimaryBrandVersion: version,
 	}, nil
+}
+
+func normalizeNativeUserAgent(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.ReplaceAll(value, "HeadlessChrome/", "Chrome/")
+	return value
 }
 
 func extractBrowserVersion(value string) string {

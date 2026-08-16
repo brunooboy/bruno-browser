@@ -52,6 +52,8 @@ func BuildArguments(options LaunchOptions) ([]string, error) {
 		"--user-data-dir=" + absoluteUserDataDir,
 		"--profile-directory=Default",
 		"--new-window",
+		"--force-dark-mode",
+		"--enable-features=WebContentsForceDark",
 		"--no-first-run",
 		"--no-default-browser-check",
 		"--disable-default-apps",

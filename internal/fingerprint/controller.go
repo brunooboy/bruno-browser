@@ -109,14 +109,6 @@ func (controller *Controller) Attach(ctx context.Context, profileID, websocketUR
 	if err := client.Call(operationContext, "", "Browser.getVersion", map[string]any{}, &version); err != nil {
 		return nil, fmt.Errorf("read Chromium version: %w", err)
 	}
-	identity, err := BuildIdentity(stored, version.Product, version.UserAgent)
-	if err != nil {
-		return nil, fmt.Errorf("build runtime fingerprint: %w", err)
-	}
-	script, err := BuildScript(identity)
-	if err != nil {
-		return nil, err
-	}
 
 	var targets struct {
 		TargetInfos []targetInfo `json:"targetInfos"`
@@ -146,6 +138,22 @@ func (controller *Controller) Attach(ctx context.Context, profileID, websocketUR
 	}
 	if attached.SessionID == "" {
 		return nil, errors.New("Chromium returned an empty CDP session id")
+	}
+	baseline, err := readRuntimeBaseline(operationContext, client, attached.SessionID)
+	if err != nil {
+		return nil, err
+	}
+	stored, err = controller.store.AlignRuntime(operationContext, profileID, baseline)
+	if err != nil {
+		return nil, err
+	}
+	identity, err := BuildIdentity(stored, version.Product, version.UserAgent)
+	if err != nil {
+		return nil, fmt.Errorf("build runtime fingerprint: %w", err)
+	}
+	script, err := BuildScript(identity)
+	if err != nil {
+		return nil, err
 	}
 
 	session := &Session{
@@ -246,21 +254,6 @@ func (session *Session) protectAsync(sessionID string, information targetInfo) {
 }
 
 func (session *Session) applyProtection(ctx context.Context, sessionID, targetType string, resume bool) error {
-	metadata := map[string]any{
-		"brands": []map[string]string{
-			{"brand": "Not=A?Brand", "version": "99"},
-			{"brand": "Chromium", "version": session.identity.BrowserMajor},
-			{"brand": session.identity.PrimaryBrand, "version": session.identity.BrowserMajor},
-		},
-		"fullVersionList": []map[string]string{
-			{"brand": "Not=A?Brand", "version": "99.0.0.0"},
-			{"brand": "Chromium", "version": session.identity.BrowserVersion},
-			{"brand": session.identity.PrimaryBrand, "version": session.identity.PrimaryBrandVersion},
-		},
-		"platform": session.identity.Platform, "platformVersion": session.identity.PlatformVersion,
-		"architecture": session.identity.Architecture, "model": "", "mobile": false,
-		"bitness": session.identity.Bitness, "wow64": false, "formFactors": []string{"Desktop"},
-	}
 	var firstErr error
 	run := func(method string, params any, result any) {
 		if err := session.client.Call(ctx, sessionID, method, params, result); err != nil && firstErr == nil {
@@ -272,13 +265,6 @@ func (session *Session) applyProtection(ctx context.Context, sessionID, targetTy
 	if isPage {
 		run("Page.enable", map[string]any{}, nil)
 	}
-	run("Emulation.setUserAgentOverride", map[string]any{
-		"userAgent": session.identity.UserAgent, "acceptLanguage": session.identity.AcceptLanguage,
-		"platform": session.identity.NavigatorPlatform, "userAgentMetadata": metadata,
-	}, nil)
-	run("Emulation.setTimezoneOverride", map[string]any{"timezoneId": session.identity.Timezone}, nil)
-	run("Emulation.setLocaleOverride", map[string]any{"locale": strings.ReplaceAll(session.identity.Locale, "-", "_")}, nil)
-	run("Emulation.setHardwareConcurrencyOverride", map[string]any{"hardwareConcurrency": session.identity.HardwareConcurrency}, nil)
 	// Older Chromium versions may not expose this experimental command. The
 	// document script also masks navigator.webdriver, so this is best-effort.
 	_ = session.client.Call(ctx, sessionID, "Emulation.setAutomationOverride", map[string]any{"enabled": false}, nil)

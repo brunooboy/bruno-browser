@@ -26,9 +26,10 @@ import type { AppNotification, BootstrapState, DashboardTelemetry, DiscordAccoun
 let toastSequence = 0
 
 const fallbackUpdates: UpdateStatus = {
-  currentVersion: '1.0.0', latestVersion: '1.0.0', updateAvailable: false,
+  currentVersion: '1.1.0', latestVersion: '1.1.0', updateAvailable: false,
   checkedAt: new Date().toISOString(), source: 'local',
   changelog: [
+    { version: '1.1.0', date: '2026-08-16', description: 'Perfis alinhados ao ambiente nativo, DuckDuckGo padrão, tema escuro forçado, cinco políticas DoH e extensão Bruno INSSIST opcional por perfil.' },
     { version: '1.0.0', date: '2026-08-16', description: 'Bruno Engine com identidade visual própria, página inicial local e fingerprint isolado e verificado por perfil.' },
     { version: '0.9.0', date: '2026-08-06', description: 'Login Discord público com PKCE e edição de proxy liberada para a próxima abertura do perfil.' },
     { version: '0.8.0', date: '2026-08-06', description: 'Licenciamento estrito, identidade 8-bit, instalador Windows e publicação de releases.' },
@@ -59,6 +60,7 @@ const toBrowserProfile = (profile: NativeProfile): BrowserProfile => ({
   tags: profile.tags,
   notes: profile.notes,
   startUrl: profile.startUrl,
+  dnsPreset: profile.dnsPreset,
   proxy: profile.proxy ? {
     mode: profile.proxy.mode,
     host: profile.proxy.host,
@@ -305,7 +307,7 @@ export default function App() {
       setBusy(true)
       try {
         await invoke('SaveNetwork', draft.profileId, {
-          mode: draft.mode, host: draft.host, port: Number(draft.port), username: draft.username,
+          mode: draft.mode, dnsPreset: draft.dnsPreset, host: draft.host, port: Number(draft.port), username: draft.username,
           password: draft.password, clearPassword: draft.clearPassword,
           bypassList: draft.bypassList.split(/\r?\n|,/).map((rule) => rule.trim()).filter(Boolean),
         })
@@ -316,7 +318,7 @@ export default function App() {
           : `Rede de ${target.name} salva no disco.`)
       } catch (error) { notify(errorText(error), 'warning'); return } finally { setBusy(false) }
     } else {
-      setProfiles((current) => current.map((item) => item.id !== draft.profileId ? item : draft.mode === 'direct' ? { ...item, proxy: null } : { ...item, proxy: { mode: draft.mode, host: draft.host, port: Number(draft.port), username: draft.username, hasPassword: Boolean(draft.password) || Boolean(item.proxy?.hasPassword), bypassList: draft.bypassList.split(/\r?\n|,/).filter(Boolean), location: 'Rota personalizada', countryCode: '--', endpoint: `${draft.host}:${draft.port}`, latencyMs: 0 } }))
+      setProfiles((current) => current.map((item) => item.id !== draft.profileId ? item : draft.mode === 'direct' ? { ...item, dnsPreset: draft.dnsPreset, proxy: null } : { ...item, dnsPreset: draft.dnsPreset, proxy: { mode: draft.mode, host: draft.host, port: Number(draft.port), username: draft.username, hasPassword: Boolean(draft.password) || Boolean(item.proxy?.hasPassword), bypassList: draft.bypassList.split(/\r?\n|,/).filter(Boolean), location: 'Rota personalizada', countryCode: '--', endpoint: `${draft.host}:${draft.port}`, latencyMs: 0 } }))
       notify('Rota alterada somente na prévia.', 'info')
     }
     setProxyModalOpen(false); setProxyProfile(null)
@@ -409,7 +411,7 @@ export default function App() {
         <StatsGrid telemetry={telemetry} /><ActivityChart telemetry={telemetry} />
         <ProfileFilters count={visibleProfiles.length} onManageTags={() => setTagModalOpen(true)} onPlatformChange={setPlatform} onSortChange={setSort} onStatusChange={setStatus} onViewChange={setView} platform={platform} sort={sort} status={status} view={view} />
         {visibleProfiles.length ? <section aria-label="Lista de perfis" className={`profiles-layout profiles-layout--${view}`}>{visibleProfiles.map((item) => <ProfileCard key={item.id} now={now} onAction={handleProfileAction} onLaunch={handleLaunch} premiumActive={premiumActive} profile={item} view={view} />)}</section> : <ProfileEmptyState onReset={resetFilters} />}
-        <footer className="dashboard-footer"><span>BRUNO BROWSER // LOCAL OPERATIONS TERMINAL</span><span><i /> DADOS DO PERFIL: DISCO LOCAL</span><span>BUILD 1.0.0</span></footer>
+        <footer className="dashboard-footer"><span>BRUNO BROWSER // LOCAL OPERATIONS TERMINAL</span><span><i /> DADOS DO PERFIL: DISCO LOCAL</span><span>BUILD 1.1.0</span></footer>
       </div>}
     </main>
     <ProfileModal onClose={() => { setProfileModalOpen(false); setEditingProfile(null) }} onManageTags={() => setTagModalOpen(true)} onSave={handleSaveProfile} open={profileModalOpen} profile={editingProfile} tags={tags} />

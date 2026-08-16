@@ -24,8 +24,8 @@ func TestPrepareDirectConfiguresDNSAndWebRTCWithoutProxy(t *testing.T) {
 		t.Fatalf("direct mode received proxy flags: %v", session.Arguments())
 	}
 	localState := readJSONMap(t, filepath.Join(paths.UserData, "Local State"))
-	if localState["dns_over_https"].(map[string]any)["mode"] != "automatic" {
-		t.Fatal("direct profile did not receive automatic DNS")
+	if localState["dns_over_https"].(map[string]any)["mode"] != "secure" {
+		t.Fatal("direct profile did not receive the normal secure DNS preset")
 	}
 }
 

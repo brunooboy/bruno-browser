@@ -82,6 +82,10 @@ Section "Bruno Browser" SEC_APP
     File "..\..\..\assets\bruno-start\newtab.css"
     File "/oname=icon.png" "..\..\..\docs\assets\bruno-browser-icon.png"
 
+    SetOutPath "$INSTDIR\native-extensions"
+    File "..\..\..\assets\native-extensions\manifest.json"
+    File "..\..\..\assets\native-extensions\Bruno-INSSIST.crx"
+
     IfFileExists "$INSTDIR\engine\chrome-win\chrome.exe" engineReady
         MessageBox MB_ICONSTOP "O Bruno Engine não pôde ser instalado. Execute o instalador novamente."
         Abort

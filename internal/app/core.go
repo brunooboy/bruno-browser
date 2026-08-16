@@ -96,6 +96,11 @@ func New(config config.Config) (*Core, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initialize extension library: %w", err)
 	}
+	if bundledPath, exists := extensions.FindBrunoINSSIST(); exists {
+		if _, _, err := extensionService.EnsureBundled(context.Background(), bundledPath, extensions.BrunoINSSISTSHA256); err != nil {
+			return nil, fmt.Errorf("initialize bundled Bruno INSSIST extension: %w", err)
+		}
+	}
 	updateService, err := updates.New(config.UpdateURL)
 	if err != nil {
 		return nil, fmt.Errorf("initialize update service: %w", err)

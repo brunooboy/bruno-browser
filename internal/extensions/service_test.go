@@ -4,7 +4,9 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -66,6 +68,38 @@ func TestInstallAndAssignCRX3(t *testing.T) {
 	}
 	if len(installed) != 0 {
 		t.Fatalf("extension remained in library: %+v", installed)
+	}
+}
+
+func TestBundledCRXIsImportedOnceAndCanStayUninstalled(t *testing.T) {
+	root := t.TempDir()
+	profiles, err := profile.NewStore(filepath.Join(root, "profiles"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := New(root, profiles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := testCRX3(t)
+	hash := sha256.Sum256(payload)
+	path := filepath.Join(root, "bundled.crx")
+	if err := os.WriteFile(path, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	extension, installed, err := service.EnsureBundled(context.Background(), path, hex.EncodeToString(hash[:]))
+	if err != nil || !installed || !extension.Bundled {
+		t.Fatalf("EnsureBundled first import: extension=%+v installed=%v err=%v", extension, installed, err)
+	}
+	if err := service.Remove(context.Background(), extension.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, installed, err := service.EnsureBundled(context.Background(), path, hex.EncodeToString(hash[:])); err != nil || installed {
+		t.Fatalf("removed bundled extension was silently restored: installed=%v err=%v", installed, err)
+	}
+	listed, err := service.List(context.Background())
+	if err != nil || len(listed) != 0 {
+		t.Fatalf("removed extension remains in the library: listed=%+v err=%v", listed, err)
 	}
 }
 

@@ -57,7 +57,7 @@ export function ExtensionsPage({ extensions, profiles, desktopMode, premiumActiv
           ) : extensions.map((extension) => (
             <button className={selectedId === extension.id ? 'extension-row extension-row--active' : 'extension-row'} key={extension.id} onClick={() => setSelectedId(extension.id)} type="button">
               <span className="extension-row__glyph">{extension.name.slice(0, 1).toUpperCase()}</span>
-              <span><strong>{extension.name}</strong><small>v{extension.version} • MV{extension.manifestVersion}</small></span>
+              <span><strong>{extension.name}</strong><small>v{extension.version} • MV{extension.manifestVersion} • {extension.bundled ? 'NATIVA BRUNO' : 'CRX LOCAL'}</small></span>
               <em>{extension.assignedProfileIds.length} PERFIS</em>
             </button>
           ))}

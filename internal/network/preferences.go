@@ -13,10 +13,39 @@ import (
 const (
 	maxChromiumPreferenceSize = 16 << 20
 	webRTCRestrictedPolicy    = "disable_non_proxied_udp"
-	dohTemplates              = "https://cloudflare-dns.com/dns-query https://dns.quad9.net/dns-query{?dns}"
 )
 
-func ApplyChromiumNetworkPreferences(userDataDir string, proxied bool) error {
+type dnsPolicy struct {
+	mode     string
+	template string
+}
+
+func policyForDNSPreset(preset DNSPreset) (dnsPolicy, error) {
+	preset, err := normalizeDNSPreset(preset)
+	if err != nil {
+		return dnsPolicy{}, err
+	}
+	switch preset {
+	case DNSLight:
+		return dnsPolicy{mode: "automatic"}, nil
+	case DNSNormal:
+		return dnsPolicy{mode: "secure", template: "https://cloudflare-dns.com/dns-query"}, nil
+	case DNSHigh:
+		return dnsPolicy{mode: "secure", template: "https://dns.quad9.net/dns-query"}, nil
+	case DNSPro:
+		return dnsPolicy{mode: "secure", template: "https://dns.adguard-dns.com/dns-query"}, nil
+	case DNSProPlus:
+		return dnsPolicy{mode: "secure", template: "https://family.adguard-dns.com/dns-query"}, nil
+	default:
+		return dnsPolicy{}, fmt.Errorf("unsupported DNS preset %q", preset)
+	}
+}
+
+func ApplyChromiumNetworkPreferences(userDataDir string, proxied bool, preset DNSPreset) error {
+	policy, err := policyForDNSPreset(preset)
+	if err != nil {
+		return err
+	}
 	preferencesPath := filepath.Join(userDataDir, "Default", "Preferences")
 	if err := mergeJSONFile(preferencesPath, func(preferences map[string]any) {
 		webrtc := childMap(preferences, "webrtc")
@@ -32,8 +61,8 @@ func ApplyChromiumNetworkPreferences(userDataDir string, proxied bool) error {
 			dns["mode"] = "off"
 			dns["templates"] = ""
 		} else {
-			dns["mode"] = "automatic"
-			dns["templates"] = dohTemplates
+			dns["mode"] = policy.mode
+			dns["templates"] = policy.template
 		}
 		asyncDNS := childMap(localState, "async_dns")
 		asyncDNS["enabled"] = !proxied

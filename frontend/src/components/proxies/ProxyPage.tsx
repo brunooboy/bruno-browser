@@ -11,6 +11,11 @@ interface ProxyPageProps {
   onTest: (profile: BrowserProfile) => void
 }
 
+const dnsLabels = {
+  light: ['LEVE', 'Automático'], normal: ['NORMAL', 'Cloudflare'], high: ['ALTO', 'Quad9'],
+  pro: ['PRO', 'AdGuard'], pro_plus: ['PRO +', 'AdGuard Family'],
+} as const
+
 export function ProxyPage({ profiles, premiumActive, testingId, onConfigure, onTest }: ProxyPageProps) {
   const routed = useMemo(() => profiles.filter((profile) => profile.proxy), [profiles])
   const medianLatency = useMemo(() => {
@@ -61,7 +66,10 @@ export function ProxyPage({ profiles, premiumActive, testingId, onConfigure, onT
           <i><span /></i>
           <div><Icon name="zap" size={19} /><span>DESTINO</span><strong>Rota verificada</strong></div>
         </div>
-        <p>Sem proxy: DNS-over-HTTPS automático com redundância e fallback do sistema. Com proxy: pré-resolução local bloqueada e domínio encaminhado pela rota configurada.</p>
+        <div className="dns-preset-overview">
+          {Object.entries(dnsLabels).map(([id, label]) => <div key={id}><span>{label[0]}</span><strong>{label[1]}</strong><small>{profiles.filter((profile) => (profile.dnsPreset ?? 'normal') === id).length} perfil(is)</small></div>)}
+        </div>
+        <p>Sem proxy: o preset escolhido configura uma política DNS-over-HTTPS real. Com proxy: pré-resolução local bloqueada e domínio encaminhado pela rota configurada. DNS não muda o IP público e não é um mecanismo de contorno de CAPTCHA.</p>
       </section>
 
       <section className="proxy-inventory">
@@ -88,7 +96,7 @@ export function ProxyPage({ profiles, premiumActive, testingId, onConfigure, onT
               </div>
               <div className="proxy-table__dns">
                 <Icon name="shield" size={14} />
-                <div><strong>{profile.proxy ? 'REMOTO' : 'AUTO DoH'}</strong><span>WebRTC LOCK</span></div>
+                <div><strong>{profile.proxy ? 'REMOTO' : dnsLabels[profile.dnsPreset ?? 'normal'][0]}</strong><span>{profile.proxy ? 'PELO PROXY' : dnsLabels[profile.dnsPreset ?? 'normal'][1]} • WebRTC LOCK</span></div>
               </div>
               <div className="proxy-table__latency">
                 <i className={!profile.proxy || (profile.proxy.latencyMs > 0 && profile.proxy.latencyMs < 90) ? 'good' : 'warn'} />

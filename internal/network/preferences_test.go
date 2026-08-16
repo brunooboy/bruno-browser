@@ -12,7 +12,7 @@ func TestApplyChromiumNetworkPreferencesForDirectConnection(t *testing.T) {
 	userData := t.TempDir()
 	preferencesPath := filepath.Join(userData, "Default", "Preferences")
 	writeNetworkTestFile(t, preferencesPath, `{"browser":{"theme":2}}`)
-	if err := ApplyChromiumNetworkPreferences(userData, false); err != nil {
+	if err := ApplyChromiumNetworkPreferences(userData, false, DNSNormal); err != nil {
 		t.Fatal(err)
 	}
 	preferences := readJSONMap(t, preferencesPath)
@@ -24,14 +24,40 @@ func TestApplyChromiumNetworkPreferencesForDirectConnection(t *testing.T) {
 	}
 	localState := readJSONMap(t, filepath.Join(userData, "Local State"))
 	dns := localState["dns_over_https"].(map[string]any)
-	if dns["mode"] != "automatic" || !strings.Contains(dns["templates"].(string), "dns.quad9.net") {
-		t.Fatalf("automatic DNS was not configured: %#v", dns)
+	if dns["mode"] != "secure" || !strings.Contains(dns["templates"].(string), "cloudflare-dns.com") {
+		t.Fatalf("normal secure DNS was not configured: %#v", dns)
+	}
+}
+
+func TestEveryDNSPresetMapsToAnExplicitChromiumPolicy(t *testing.T) {
+	tests := []struct {
+		preset   DNSPreset
+		mode     string
+		template string
+	}{
+		{DNSLight, "automatic", ""},
+		{DNSNormal, "secure", "cloudflare-dns.com"},
+		{DNSHigh, "secure", "dns.quad9.net"},
+		{DNSPro, "secure", "dns.adguard-dns.com"},
+		{DNSProPlus, "secure", "family.adguard-dns.com"},
+	}
+	for _, test := range tests {
+		t.Run(string(test.preset), func(t *testing.T) {
+			userData := t.TempDir()
+			if err := ApplyChromiumNetworkPreferences(userData, false, test.preset); err != nil {
+				t.Fatal(err)
+			}
+			dns := readJSONMap(t, filepath.Join(userData, "Local State"))["dns_over_https"].(map[string]any)
+			if dns["mode"] != test.mode || !strings.Contains(dns["templates"].(string), test.template) {
+				t.Fatalf("unexpected DNS policy for %s: %#v", test.preset, dns)
+			}
+		})
 	}
 }
 
 func TestApplyChromiumNetworkPreferencesForProxy(t *testing.T) {
 	userData := t.TempDir()
-	if err := ApplyChromiumNetworkPreferences(userData, true); err != nil {
+	if err := ApplyChromiumNetworkPreferences(userData, true, DNSProPlus); err != nil {
 		t.Fatal(err)
 	}
 	localState := readJSONMap(t, filepath.Join(userData, "Local State"))

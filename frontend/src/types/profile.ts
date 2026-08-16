@@ -12,6 +12,8 @@ export type RiskLevel = 'low' | 'medium' | 'high'
 
 export type ProxyMode = 'direct' | 'http' | 'socks5'
 
+export type DNSPreset = 'light' | 'normal' | 'high' | 'pro' | 'pro_plus'
+
 export interface ProfileTag {
   id: string
   label: string
@@ -35,6 +37,7 @@ export interface ProfileProxy {
 export interface ProxyDraft {
   profileId: string
   mode: ProxyMode
+  dnsPreset: DNSPreset
   host: string
   port: string
   username: string
@@ -53,6 +56,7 @@ export interface BrowserProfile {
   tags: ProfileTag[]
   notes: string
   startUrl: string
+  dnsPreset?: DNSPreset
   proxy: ProfileProxy | null
   fingerprintScore: number
   sessions: number

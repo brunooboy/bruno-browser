@@ -152,6 +152,7 @@ func TestLiveChromiumFingerprintIsAppliedBeforeNavigation(t *testing.T) {
 		DeviceMemory        int    `json:"deviceMemory"`
 		UserAgent           string `json:"userAgent"`
 		CanvasStable        bool   `json:"canvasStable"`
+		DarkScheme          bool   `json:"darkScheme"`
 	}
 	expression := `(() => {
       const render = () => {
@@ -167,7 +168,8 @@ func TestLiveChromiumFingerprintIsAppliedBeforeNavigation(t *testing.T) {
         hardwareConcurrency: navigator.hardwareConcurrency,
         deviceMemory: navigator.deviceMemory || 0,
         userAgent: navigator.userAgent,
-        canvasStable: render() === render()
+        canvasStable: render() === render(),
+        darkScheme: matchMedia("(prefers-color-scheme: dark)").matches
       };
     })()`
 	if err := chromedp.Run(inspectionContext, chromedp.Evaluate(expression, &observation)); err != nil {
@@ -176,7 +178,7 @@ func TestLiveChromiumFingerprintIsAppliedBeforeNavigation(t *testing.T) {
 	if !observation.Webdriver || observation.Language != persistentIdentity.Locale ||
 		observation.Timezone != persistentIdentity.Timezone || observation.Platform != persistentIdentity.NavigatorPlatform ||
 		observation.HardwareConcurrency != persistentIdentity.HardwareConcurrency || observation.DeviceMemory != persistentIdentity.DeviceMemory ||
-		!observation.CanvasStable || !strings.Contains(observation.UserAgent, "Chrome/") {
+		!observation.CanvasStable || !observation.DarkScheme || !strings.Contains(observation.UserAgent, "Chrome/") {
 		t.Fatalf("live fingerprint differs from its persistent profile: observation=%#v identity=%#v", observation, persistentIdentity)
 	}
 

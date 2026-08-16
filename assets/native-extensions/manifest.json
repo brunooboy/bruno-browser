@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "packages": [
+    {
+      "file": "Bruno-INSSIST.crx",
+      "name": "Bruno Inssist",
+      "version": "36.0.1",
+      "sha256": "1199419b25f78202d0c3cb8828ffcf3cdbb92c8e9c7059b6043f4078ee9070ad",
+      "assignment": "optional-per-profile"
+    }
+  ]
+}
