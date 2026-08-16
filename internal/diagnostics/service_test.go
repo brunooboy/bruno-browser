@@ -3,9 +3,11 @@ package diagnostics
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"bruno-browser/internal/account"
@@ -77,6 +79,58 @@ func TestIncidentLogIsBoundedAndRecoversFromInvalidJSON(t *testing.T) {
 	incidents, err = service.Incidents(context.Background())
 	if err != nil || len(incidents) != 0 {
 		t.Fatalf("diagnostics log was not cleared: %+v, %v", incidents, err)
+	}
+}
+
+func TestSupportReportExportsOnlyOperationalInventory(t *testing.T) {
+	service, profiles := createDiagnosticService(t)
+	metadata, err := profiles.Create(context.Background(), profile.Fields{
+		Name: "Cliente confidencial", Color: "#42ff91", Notes: "senha da conta: segredo",
+		StartURL:  "https://conta-confidencial.example/login",
+		Platforms: []domain.Platform{domain.PlatformGoogle}, Status: domain.StatusStarting,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.network.Save(context.Background(), metadata.ID, network.SaveInput{
+		Mode: network.ModeSOCKS5, DNSPreset: network.DNSPro,
+		Host: "proxy-confidencial.example", Port: 1080, Username: "usuario-secreto", Password: "senha-secreta",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Record(context.Background(), "network_test", errors.New("socks5://usuario-secreto:senha-secreta@proxy-confidencial.example:1080 falhou")); err != nil {
+		t.Fatal(err)
+	}
+
+	destination := filepath.Join(t.TempDir(), "suporte")
+	exported, err := service.ExportSupportReport(context.Background(), destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Ext(exported.Path) != ".json" || exported.Bytes == 0 {
+		t.Fatalf("unexpected export: %+v", exported)
+	}
+	payload, err := os.ReadFile(exported.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sensitive := range []string{
+		"Cliente confidencial", "senha da conta", "conta-confidencial.example",
+		"proxy-confidencial.example", "usuario-secreto", "senha-secreta", metadata.ID,
+	} {
+		if strings.Contains(string(payload), sensitive) {
+			t.Fatalf("support report exposed sensitive value %q: %s", sensitive, payload)
+		}
+	}
+	var report SupportReport
+	if err := json.Unmarshal(payload, &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.Inventory.Profiles != 1 || report.Inventory.ProxyRoutes != 1 || len(report.Profiles) != 1 {
+		t.Fatalf("support inventory is incomplete: %+v", report)
+	}
+	if report.Profiles[0].Reference != "profile-001" || report.Profiles[0].NetworkMode != "socks5" || report.Profiles[0].DNSPreset != "pro" {
+		t.Fatalf("unexpected anonymous profile inventory: %+v", report.Profiles[0])
 	}
 }
 

@@ -180,6 +180,12 @@ export interface SystemDiagnostics {
   incidents: DiagnosticIncident[]
 }
 
+export interface SupportExport {
+  path: string
+  bytes: number
+  generatedAt: string
+}
+
 export interface BootstrapState {
   profiles: NativeProfile[]
   account?: DiscordAccount

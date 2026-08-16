@@ -295,7 +295,7 @@ if (-not $NoInstaller) {
     Write-Host 'Recompilando o instalador com os executáveis identificados...'
     Push-Location $brunoInstallerDirectory
     try {
-        & $brunoMakeNsis "-DARG_WAILS_AMD64_BINARY=$brunoAmd64Executable" "-DARG_WAILS_ARM64_BINARY=$brunoArm64Executable" 'project.nsi'
+        & $brunoMakeNsis '-DBRUNO_FINAL_PACKAGE=1' "-DARG_WAILS_AMD64_BINARY=$brunoAmd64Executable" "-DARG_WAILS_ARM64_BINARY=$brunoArm64Executable" 'project.nsi'
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     } finally {
         Pop-Location

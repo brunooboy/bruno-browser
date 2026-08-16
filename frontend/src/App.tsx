@@ -9,6 +9,7 @@ import { TopBar } from './components/dashboard/TopBar'
 import { ExtensionsPage } from './components/extensions/ExtensionsPage'
 import { ProfileModal } from './components/modals/ProfileModal'
 import { TagManagerModal } from './components/modals/TagManagerModal'
+import { OnboardingModal } from './components/onboarding/OnboardingModal'
 import { ProfileCard, type ProfileAction } from './components/profiles/ProfileCard'
 import { ProfileEmptyState } from './components/profiles/ProfileEmptyState'
 import { ProfileFilters } from './components/profiles/ProfileFilters'
@@ -20,15 +21,17 @@ import { initialProfiles, initialTags } from './data/demoProfiles'
 import { useNow } from './hooks/useNow'
 import { createProfileId, sortProfiles } from './lib/profile'
 import { loadNotifications, persistNotifications, prependNotification } from './lib/notifications'
+import { activePlan, onboardingProgress, onboardingStorageKey } from './lib/onboarding'
 import type { BrowserProfile, Platform, ProfileDraft, ProfileStatus, ProfileTag, ProxyDraft } from './types/profile'
-import type { AppNotification, BootstrapState, DashboardTelemetry, DiscordAccount, InstalledExtension, KeyClaims, KeyHistoryEntry, LicensePlan, NativeProfile, PlanStatus, SystemDiagnostics, UpdateDownloadResult, UpdateStatus } from './types/system'
+import type { AppNotification, BootstrapState, DashboardTelemetry, DiscordAccount, InstalledExtension, KeyClaims, KeyHistoryEntry, LicensePlan, NativeProfile, PlanStatus, SupportExport, SystemDiagnostics, UpdateDownloadResult, UpdateStatus } from './types/system'
 
 let toastSequence = 0
 
 const fallbackUpdates: UpdateStatus = {
-  currentVersion: '1.3.0', latestVersion: '1.3.0', updateAvailable: false, installAvailable: false,
+  currentVersion: '1.4.0', latestVersion: '1.4.0', updateAvailable: false, installAvailable: false,
   checkedAt: new Date().toISOString(), source: 'local',
   changelog: [
+    { version: '1.4.0', date: '2026-08-16', description: 'Configuração inicial guiada, validação do primeiro uso e exportação anônima de diagnóstico para suporte.' },
     { version: '1.3.0', date: '2026-08-16', description: 'Diagnóstico integrado, registro local de falhas, recuperação automática de metadados e homologação dos fluxos críticos.' },
     { version: '1.2.0', date: '2026-08-16', description: 'Atualizador com SHA-256 e rollback, formulário de proxy estável e associação de extensões sincronizada com perfis recém-criados.' },
     { version: '1.1.0', date: '2026-08-16', description: 'Perfis alinhados ao ambiente nativo, DuckDuckGo padrão, tema escuro forçado, cinco políticas DoH e extensão Bruno INSSIST opcional por perfil.' },
@@ -42,9 +45,7 @@ const fallbackUpdates: UpdateStatus = {
 }
 
 const emptyPlan: PlanStatus = { activated: false, status: 'none' }
-const isPlanActive = (plan: PlanStatus) => plan.activated
-  && plan.status === 'active'
-  && (!plan.expires_at || plan.expires_at * 1000 > Date.now())
+const isPlanActive = activePlan
 const emptyTelemetry: DashboardTelemetry = {
   generatedAt: '1970-01-01T00:00:00.000Z',
   summary: { totalProfiles: 0, newProfilesThisMonth: 0, runningProfiles: 0, successfulLaunches24h: 0, configuredProxies: 0, healthyProxies: 0, proxyHealthPercent: 0, medianProxyLatencyMs: 0, attentionProfiles: 0 },
@@ -125,6 +126,7 @@ export default function App() {
   const [keyHistory, setKeyHistory] = useState<KeyHistoryEntry[]>([])
   const [telemetry, setTelemetry] = useState<DashboardTelemetry>(emptyTelemetry)
   const [diagnostics, setDiagnostics] = useState<SystemDiagnostics>(emptyDiagnostics)
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [notifications, setNotifications] = useState<AppNotification[]>(() => loadNotifications(localStorage))
   const [coreOnline, setCoreOnline] = useState(false)
   const profileSyncRevision = useRef(0)
@@ -174,7 +176,13 @@ export default function App() {
     if (!desktopMode) return
     setBusy(true)
     invoke<BootstrapState>('Bootstrap')
-      .then((state) => { applyBootstrap(state); setCoreOnline(true) })
+      .then((state) => {
+        applyBootstrap(state)
+        setCoreOnline(true)
+        const progress = onboardingProgress({ account: state.account, diagnostics: state.diagnostics, plan: state.plan, profileCount: state.profiles.length })
+        if (progress.complete) localStorage.setItem(onboardingStorageKey, 'complete')
+        else if (!localStorage.getItem(onboardingStorageKey)) setOnboardingOpen(true)
+      })
       .catch((error) => { setCoreOnline(false); notify(`Falha ao iniciar o núcleo: ${errorText(error)}`, 'warning') })
       .finally(() => setBusy(false))
   }, [desktopMode])
@@ -394,6 +402,14 @@ export default function App() {
     catch (error) { notify(errorText(error), 'warning') } finally { setBusy(false) }
   }
 
+  const handleExportSupport = async () => {
+    setBusy(true)
+    try {
+      const exported = await invoke<SupportExport>('ExportSupportReport')
+      if (exported.path) notify(`Relatório seguro salvo em ${exported.path}.`, 'info')
+    } catch (error) { notify(errorText(error), 'warning') } finally { setBusy(false) }
+  }
+
   const handleLogin = async () => {
     setBusy(true)
     try { const user = await invoke<DiscordAccount>('LoginDiscord'); setAccount(user); setPlan(await invoke<PlanStatus>('LicenseStatus')); notify(`Discord conectado como ${user.username}.`) }
@@ -428,6 +444,16 @@ export default function App() {
     } catch (error) { notify(errorText(error), 'warning') }
   }
 
+  const onboardingState = onboardingProgress({ account, diagnostics, plan, profileCount: profiles.length })
+  const closeOnboarding = () => {
+    localStorage.setItem(onboardingStorageKey, onboardingState.complete ? 'complete' : 'dismissed')
+    setOnboardingOpen(false)
+  }
+  const createProfileFromOnboarding = () => {
+    setOnboardingOpen(false)
+    openCreateModal()
+  }
+
   const handleNavigate = (section: string) => { if (section === 'tags') { setTagModalOpen(true); return }; setActiveSection(section); setSearch('') }
   const resetFilters = () => { setSearch(''); setStatus('all'); setPlatform('all') }
 
@@ -446,18 +472,19 @@ export default function App() {
       {activeSection === 'proxies' ? <ProxyPage onConfigure={openProxyModal} onTest={handleTestProxy} premiumActive={premiumActive} profiles={profiles.filter((item) => !search.trim() || [item.name, item.id, item.proxy?.host ?? 'direto'].some((value) => value.toLowerCase().includes(search.toLowerCase())))} testingId={testingProxyId} />
       : activeSection === 'extensions' ? <ExtensionsPage busy={busy} desktopMode={desktopMode} extensions={extensions} onInstall={handleInstallExtension} onRemove={handleRemoveExtension} onSaveAssignments={handleAssignExtension} premiumActive={premiumActive} profiles={profiles} />
       : activeSection === 'updates' ? <UpdatesPage busy={busy} desktopMode={desktopMode} onCheck={handleCheckUpdates} onInstall={handleInstallUpdate} status={updates} />
-      : activeSection === 'settings' ? <SettingsPage account={account} busy={busy} desktopMode={desktopMode} diagnostics={diagnostics} oauthConfigured={oauthConfigured} onActivate={handleActivate} onClearDiagnostics={handleClearDiagnostics} onDeactivate={handleDeactivate} onLogin={handleLogin} onLogout={handleLogout} onRunDiagnostics={handleRunDiagnostics} onSaveTheme={handleSaveTheme} plan={plan} preferences={{ accentColor }} settingsPath={settingsPath} />
+      : activeSection === 'settings' ? <SettingsPage account={account} busy={busy} desktopMode={desktopMode} diagnostics={diagnostics} oauthConfigured={oauthConfigured} onActivate={handleActivate} onClearDiagnostics={handleClearDiagnostics} onDeactivate={handleDeactivate} onExportSupport={handleExportSupport} onLogin={handleLogin} onLogout={handleLogout} onOpenOnboarding={() => setOnboardingOpen(true)} onRunDiagnostics={handleRunDiagnostics} onSaveTheme={handleSaveTheme} plan={plan} preferences={{ accentColor }} settingsPath={settingsPath} />
       : activeSection === 'admin' && account?.isAdmin ? <AdminPage busy={busy} history={keyHistory} onCopy={handleCopy} onGenerate={handleGenerateKey} onInspect={handleInspectKey} />
       : <div className="dashboard-content">
         <StatsGrid telemetry={telemetry} /><ActivityChart telemetry={telemetry} />
         <ProfileFilters count={visibleProfiles.length} onManageTags={() => setTagModalOpen(true)} onPlatformChange={setPlatform} onSortChange={setSort} onStatusChange={setStatus} onViewChange={setView} platform={platform} sort={sort} status={status} view={view} />
         {visibleProfiles.length ? <section aria-label="Lista de perfis" className={`profiles-layout profiles-layout--${view}`}>{visibleProfiles.map((item) => <ProfileCard key={item.id} now={now} onAction={handleProfileAction} onLaunch={handleLaunch} premiumActive={premiumActive} profile={item} view={view} />)}</section> : <ProfileEmptyState onReset={resetFilters} />}
-        <footer className="dashboard-footer"><span>BRUNO BROWSER // LOCAL OPERATIONS TERMINAL</span><span><i /> DADOS DO PERFIL: DISCO LOCAL</span><span>BUILD 1.3.0</span></footer>
+        <footer className="dashboard-footer"><span>BRUNO BROWSER // LOCAL OPERATIONS TERMINAL</span><span><i /> DADOS DO PERFIL: DISCO LOCAL</span><span>BUILD 1.4.0</span></footer>
       </div>}
     </main>
     <ProfileModal onClose={() => { setProfileModalOpen(false); setEditingProfile(null) }} onManageTags={() => setTagModalOpen(true)} onSave={handleSaveProfile} open={profileModalOpen} profile={editingProfile} tags={tags} />
     <TagManagerModal onAdd={handleAddTag} onClose={() => setTagModalOpen(false)} onRemove={handleRemoveTag} open={tagModalOpen} tags={tags} />
     <ProxyModal initialProfile={proxyProfile} onClose={() => { setProxyModalOpen(false); setProxyProfile(null) }} onSave={handleSaveProxy} open={proxyModalOpen} profiles={profiles} />
+    <OnboardingModal account={account} busy={busy} desktopMode={desktopMode} diagnostics={diagnostics} oauthConfigured={oauthConfigured} onActivate={handleActivate} onClose={closeOnboarding} onCreateProfile={createProfileFromOnboarding} onLogin={handleLogin} onRunDiagnostics={handleRunDiagnostics} open={onboardingOpen} plan={plan} profileCount={profiles.length} />
     <ToastStack toasts={toasts} />
   </div>
 }

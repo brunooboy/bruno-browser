@@ -14,8 +14,10 @@ interface SettingsPageProps {
   onActivate: (key: string) => Promise<void>
   onDeactivate: () => Promise<void>
   onClearDiagnostics: () => Promise<void>
+  onExportSupport: () => Promise<void>
   onLogin: () => Promise<void>
   onLogout: () => Promise<void>
+  onOpenOnboarding: () => void
   onRunDiagnostics: () => Promise<void>
   onSaveTheme: (color: string) => Promise<void>
 }
@@ -48,6 +50,7 @@ export function SettingsPage(props: SettingsPageProps) {
             <label><span>PERSONALIZADA</span><input onChange={(event) => setAccent(event.target.value)} type="color" value={accent} /></label>
           </div>
           <button className="primary-button" disabled={props.busy || !props.desktopMode} onClick={() => props.onSaveTheme(accent)} type="button">Salvar tema</button>
+          <button className="ghost-button" disabled={props.busy} onClick={props.onOpenOnboarding} type="button"><Icon name="play" size={14} /> Abrir configuração inicial</button>
         </section>
 
         <section className="system-panel settings-card account-card">
@@ -88,6 +91,7 @@ export function SettingsPage(props: SettingsPageProps) {
         </div>
         <div className="diagnostics-actions">
           <button className="primary-button" disabled={props.busy || !props.desktopMode} onClick={props.onRunDiagnostics} type="button"><Icon name="activity" size={15} /> Executar diagnóstico</button>
+          <button className="ghost-button" disabled={props.busy || !props.desktopMode} onClick={props.onExportSupport} type="button"><Icon name="download" size={15} /> Exportar para suporte</button>
           <small>Última leitura: {props.diagnostics.generatedAt.startsWith('1970-') ? 'ainda não executado' : new Date(props.diagnostics.generatedAt).toLocaleString('pt-BR')}</small>
         </div>
         <div className="diagnostics-log">

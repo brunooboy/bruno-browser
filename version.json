@@ -1,7 +1,12 @@
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "publishedAt": "2026-08-16T00:00:00Z",
   "changelog": [
+    {
+      "version": "1.4.0",
+      "date": "2026-08-16",
+      "description": "Configuração inicial guiada, validação do primeiro uso e exportação anônima de diagnóstico para suporte."
+    },
     {
       "version": "1.3.0",
       "date": "2026-08-16",

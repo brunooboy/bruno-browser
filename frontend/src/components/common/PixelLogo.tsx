@@ -43,7 +43,7 @@ export function PixelLogo({ compact = false }: { compact?: boolean }) {
           <PixelWord color="#42ff91" word="BRUNO" y={1} />
           <PixelWord color="#dce7e2" word="BROWSER" y={17} />
         </svg>
-        <span className="pixel-logo__caption">LOCAL OPS // 1.3</span>
+        <span className="pixel-logo__caption">LOCAL OPS // 1.4</span>
       </div>}
     </div>
   )

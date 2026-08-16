@@ -4,7 +4,7 @@
 
 Navegador de perfis local-first para Windows, feito com Go, Wails, React e TypeScript. Cada perfil usa um diretório físico próprio do Chromium, preservando cookies, sessões e armazenamento local no disco.
 
-> Versão atual: **1.3.0** · Windows 10/11 · x64 e ARM64
+> Versão atual: **1.4.0** · Windows 10/11 · x64 e ARM64
 
 ## Instalação
 
@@ -33,9 +33,17 @@ O pacote atual ainda não possui assinatura Authenticode. Por isso, o Microsoft 
 - Changelog e verificação de atualização por manifesto JSON.
 - Tema e central de notificações persistentes.
 - Diagnóstico integrado de engine, disco, perfis, rede, extensões, licença e atualizações, com registro local limitado de falhas.
+- Guia de primeira execução ligado ao diagnóstico, login Discord, ativação do plano e criação do primeiro perfil.
+- Exportação manual de relatório anônimo para suporte, sem nomes de perfil, Discord ID, URLs, hosts ou credenciais.
 - Backup atômico de `metadata.json` e restauração automática do perfil quando o arquivo principal é interrompido ou corrompido.
 
 As operações premium são validadas novamente pelo backend antes de iniciar perfil, alterar rede ou gerenciar extensões. Remover uma key ou atingir a data de expiração bloqueia essas operações imediatamente. Uma rota HTTP/SOCKS5 pode ser salva com o perfil aberto e entra em vigor na próxima abertura.
+
+## Primeira execução e suporte
+
+Em uma instalação nova, o aplicativo abre um guia de quatro etapas e usa o estado real do núcleo para marcar cada item: armazenamento/Bruno Engine, conta Discord, plano válido e primeiro perfil físico. O guia pode ser dispensado e reaberto em **Configurações > Abrir configuração inicial**.
+
+Em **Configurações > Diagnóstico do aplicativo**, o botão **Exportar para suporte** cria um JSON no local escolhido pelo usuário. O arquivo contém versão, arquitetura, estados dos subsistemas e inventário operacional anônimo. Ele não inclui nomes ou IDs de perfis, notas, páginas visitadas, Discord ID, conteúdo de keys, endereço do proxy, usuário ou senha.
 
 ## Dados locais
 

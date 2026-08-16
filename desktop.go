@@ -395,6 +395,22 @@ func (d *Desktop) ClearDiagnosticLog() (diagnostics.Report, error) {
 	return d.core.Diagnostics.Run(d.context())
 }
 
+func (d *Desktop) ExportSupportReport() (result diagnostics.SupportExport, operationErr error) {
+	path, err := runtime.SaveFileDialog(d.context(), runtime.SaveDialogOptions{
+		Title:           "Exportar diagnóstico do Bruno Browser",
+		DefaultFilename: "bruno-browser-support-" + time.Now().Format("20060102-150405") + ".json",
+		Filters:         []runtime.FileFilter{{DisplayName: "Relatório JSON (*.json)", Pattern: "*.json"}},
+	})
+	if err != nil {
+		return diagnostics.SupportExport{}, err
+	}
+	if path == "" {
+		return diagnostics.SupportExport{}, nil
+	}
+	defer func() { d.recordFailure("support_export", operationErr) }()
+	return d.core.Diagnostics.ExportSupportReport(d.context(), path)
+}
+
 func (d *Desktop) listProfiles(ctx context.Context) ([]ProfileView, error) {
 	profiles, _, err := d.listProfilesAndTelemetry(ctx)
 	return profiles, err

@@ -13,7 +13,11 @@ VIAddVersionKey "LegalCopyright" "${INFO_COPYRIGHT}"
 VIAddVersionKey "ProductName" "${INFO_PRODUCTNAME}"
 
 ManifestDPIAware true
-SetCompressor /SOLID lzma
+!ifdef BRUNO_FINAL_PACKAGE
+    SetCompressor /SOLID lzma
+!else
+    SetCompressor zlib
+!endif
 BrandingText "Bruno Browser // Local Operations"
 
 !include "MUI.nsh"
