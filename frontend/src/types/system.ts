@@ -122,9 +122,26 @@ export interface UpdateStatus {
   currentVersion: string
   latestVersion: string
   updateAvailable: boolean
+  installAvailable: boolean
+  installReason?: string
+  asset?: {
+    name: string
+    url: string
+    sha256: string
+    size: number
+  }
   checkedAt: string
   source: string
   changelog: ChangelogEntry[]
+}
+
+export interface UpdateDownloadResult {
+  version: string
+  path: string
+  name: string
+  sha256: string
+  bytes: number
+  ready: boolean
 }
 
 export interface InstalledExtension {

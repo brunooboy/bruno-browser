@@ -1,7 +1,12 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publishedAt": "2026-08-16T00:00:00Z",
   "changelog": [
+    {
+      "version": "1.2.0",
+      "date": "2026-08-16",
+      "description": "Atualizador com SHA-256 e rollback, formulário de proxy estável e associação de extensões sincronizada com perfis recém-criados."
+    },
     {
       "version": "1.1.0",
       "date": "2026-08-16",

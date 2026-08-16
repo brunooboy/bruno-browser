@@ -2,12 +2,23 @@
   "manifest_version": 3,
   "name": "Bruno Start",
   "description": "Página inicial local do Bruno Engine.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "icons": {
     "16": "icon.png",
     "32": "icon.png",
     "48": "icon.png",
     "128": "icon.png"
+  },
+  "chrome_settings_overrides": {
+    "search_provider": {
+      "name": "DuckDuckGo",
+      "keyword": "duckduckgo.com",
+      "search_url": "https://duckduckgo.com/?q={searchTerms}",
+      "suggest_url": "https://duckduckgo.com/ac/?q={searchTerms}&type=list",
+      "favicon_url": "https://duckduckgo.com/favicon.ico",
+      "encoding": "UTF-8",
+      "is_default": true
+    }
   },
   "chrome_url_overrides": {
     "newtab": "newtab.html"

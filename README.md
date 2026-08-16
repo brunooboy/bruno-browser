@@ -4,7 +4,7 @@
 
 Navegador de perfis local-first para Windows, feito com Go, Wails, React e TypeScript. Cada perfil usa um diretório físico próprio do Chromium, preservando cookies, sessões e armazenamento local no disco.
 
-> Versão atual: **1.1.0** · Windows 10/11 · x64 e ARM64
+> Versão atual: **1.2.0** · Windows 10/11 · x64 e ARM64
 
 ## Instalação
 
@@ -20,9 +20,9 @@ O pacote atual ainda não possui assinatura Authenticode. Por isso, o Microsoft 
 
 - Perfis persistentes com `--user-data-dir` exclusivo e restauração de sessão.
 - Metadados, plataformas, tags, notas e maturidade por perfil.
-- Bruno Engine integrado, com ícone e página inicial próprios, iniciado em uma janela separada por perfil.
+- Bruno Engine integrado, com nome, ícone, título de janela e página inicial próprios, iniciado em uma janela separada por perfil.
 - Fingerprint persistente por perfil, alinhado ao idioma, fuso, plataforma, hardware e GPU realmente expostos pelo Bruno Engine antes da navegação.
-- DuckDuckGo inicializado como busca padrão, preservando uma escolha posterior feita manualmente pelo usuário.
+- DuckDuckGo controlado pela extensão nativa Bruno Start e persistido no banco interno de busca de cada perfil.
 - Tema escuro do navegador e renderização escura forçada para conteúdo web.
 - Proxy HTTP/SOCKS5 por perfil, DNS pelo proxy e proteção contra vazamento WebRTC.
 - Cinco políticas DNS por perfil: Leve, Normal (Cloudflare), Alto (Quad9), Pro (AdGuard) e Pro+ (AdGuard Family).
@@ -47,6 +47,7 @@ bruno-browser/
 ├── keys-history.json
 ├── license.json
 ├── preferences.json
+├── updates/                 downloads verificados e rollback temporário
 └── profiles/
     └── <profile-uuid>/
         ├── metadata.json
@@ -88,7 +89,9 @@ Os presets configuram provedores DoH reais e filtros progressivos. Eles protegem
 https://raw.githubusercontent.com/brunooboy/bruno-browser/main/version.json
 ```
 
-Sem uma URL configurada, a página de Atualizações continua exibindo o changelog local.
+Quando uma versão mais nova existe, o app consulta a Release correspondente no GitHub e só habilita **Baixar e instalar** se encontrar um instalador com digest SHA-256 publicado. A versão instalada baixa o pacote em `%AppData%\bruno-browser\updates`, confere tamanho e hash, fecha os perfis abertos, cria um ponto de restauração e inicia um helper isolado. O backup só é removido depois que a interface da nova versão confirma que iniciou; caso contrário, a instalação anterior é restaurada e reaberta.
+
+A instalação automática é oferecida para o aplicativo instalado em `%LocalAppData%\Programs\Bruno Browser`. Pacotes portáteis continuam apontando para o instalador da Release, pois atualizar arquivos dentro de uma pasta portátil arbitrária não oferece as mesmas garantias de restauração. Sem uma URL configurada, a página de Atualizações continua exibindo o changelog local.
 
 ## Desenvolvimento e testes
 

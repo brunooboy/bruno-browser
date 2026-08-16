@@ -6,9 +6,10 @@ interface UpdatesPageProps {
   busy: boolean
   desktopMode: boolean
   onCheck: () => Promise<void>
+  onInstall: () => Promise<void>
 }
 
-export function UpdatesPage({ status, busy, desktopMode, onCheck }: UpdatesPageProps) {
+export function UpdatesPage({ status, busy, desktopMode, onCheck, onInstall }: UpdatesPageProps) {
   return (
     <div className="system-page updates-page">
       <section className={status.updateAvailable ? 'update-banner update-banner--available' : 'update-banner'}>
@@ -18,10 +19,17 @@ export function UpdatesPage({ status, busy, desktopMode, onCheck }: UpdatesPageP
           <h2>{status.updateAvailable ? `Versão ${status.latestVersion} disponível` : 'Seu aplicativo está atualizado'}</h2>
           <p>Versão instalada <b>v{status.currentVersion}</b> • última verificação {new Date(status.checkedAt).toLocaleString('pt-BR')}</p>
         </div>
-        <button className="primary-button" disabled={busy || !desktopMode} onClick={onCheck} type="button">
-          <Icon className={busy ? 'spin' : ''} name="refresh" size={16} /> {busy ? 'Verificando...' : 'Verificar agora'}
-        </button>
+        <div className="update-actions">
+          <button className="ghost-button" disabled={busy || !desktopMode} onClick={onCheck} type="button">
+            <Icon className={busy ? 'spin' : ''} name="refresh" size={16} /> Verificar agora
+          </button>
+          {status.updateAvailable && <button className="primary-button" disabled={busy || !desktopMode || !status.installAvailable} onClick={onInstall} title={status.installReason} type="button">
+            <Icon className={busy ? 'spin' : ''} name="download" size={16} /> {busy ? 'Baixando e verificando...' : 'Baixar e instalar'}
+          </button>}
+        </div>
       </section>
+
+      {status.updateAvailable && !status.installAvailable && <div className="system-notice system-notice--warning"><Icon name="alert" size={15} /> {status.installReason || 'Instalador automático indisponível para esta release.'}</div>}
 
       <section className="system-panel changelog-panel">
         <header><div><span>CHANGELOG LOCAL</span><h3>Histórico de versões</h3></div><em>{status.source === 'local' ? 'MANIFEST LOCAL' : 'ENDPOINT REMOTO'}</em></header>

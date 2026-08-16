@@ -130,14 +130,20 @@ function Set-BrunoEngineBranding {
         [Parameter(Mandatory = $true)]$Definition
     )
     $brunoChromePath = Join-Path $EngineRoot 'chrome-win\chrome.exe'
+    $brunoChromeDllPath = Join-Path $EngineRoot 'chrome-win\chrome.dll'
+    $brunoLocalesPath = Join-Path $EngineRoot 'chrome-win\locales'
     $brunoIconPath = Join-Path $brunoWorkspace 'build\windows\icon.ico'
+    $brunoBrandScriptPath = Join-Path $brunoWorkspace 'scripts\brand-engine.mjs'
     $brunoBrandMarker = Join-Path $EngineRoot '.bruno-engine-brand'
     $brunoIconHash = (Get-FileHash -LiteralPath $brunoIconPath -Algorithm SHA256).Hash
-    $brunoBrandKey = "$($Definition.version)|$brunoIconHash|$($Definition.toolSha256)"
+    $brunoBrandScriptHash = (Get-FileHash -LiteralPath $brunoBrandScriptPath -Algorithm SHA256).Hash
+    $brunoBrandKey = "$($Definition.version)|$brunoIconHash|$($Definition.toolSha256)|$brunoBrandScriptHash"
     $brunoCurrentProduct = (Get-Item -LiteralPath $brunoChromePath).VersionInfo.ProductName
+    $brunoCurrentDllProduct = (Get-Item -LiteralPath $brunoChromeDllPath).VersionInfo.ProductName
     $brunoAlreadyBranded = (Test-Path -LiteralPath $brunoBrandMarker) -and
         ((Get-Content -LiteralPath $brunoBrandMarker -Raw).Trim() -eq $brunoBrandKey) -and
-        ($brunoCurrentProduct -eq 'Bruno Engine')
+        ($brunoCurrentProduct -eq 'Bruno Engine') -and
+        ($brunoCurrentDllProduct -eq 'Bruno Engine')
     if ($brunoAlreadyBranded) { return }
 
     Write-Host "Aplicando logo e identidade Bruno Engine em $EngineRoot..."
@@ -148,8 +154,19 @@ function Set-BrunoEngineBranding {
         --set-version-string CompanyName 'Bruno Browser' `
         --set-version-string InternalName 'Bruno Engine'
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $ToolPath $brunoChromeDllPath `
+        --set-icon $brunoIconPath `
+        --set-version-string ProductName 'Bruno Engine' `
+        --set-version-string FileDescription 'Bruno Engine Core' `
+        --set-version-string CompanyName 'Bruno Browser' `
+        --set-version-string InternalName 'Bruno Engine'
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    node $brunoBrandScriptPath patch-locales $brunoLocalesPath
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     $brunoVersionInfo = (Get-Item -LiteralPath $brunoChromePath).VersionInfo
-    if ($brunoVersionInfo.ProductName -ne 'Bruno Engine' -or $brunoVersionInfo.CompanyName -ne 'Bruno Browser') {
+    $brunoDllVersionInfo = (Get-Item -LiteralPath $brunoChromeDllPath).VersionInfo
+    if ($brunoVersionInfo.ProductName -ne 'Bruno Engine' -or $brunoVersionInfo.CompanyName -ne 'Bruno Browser' -or
+        $brunoDllVersionInfo.ProductName -ne 'Bruno Engine' -or $brunoDllVersionInfo.CompanyName -ne 'Bruno Browser') {
         throw "A identidade do Bruno Engine não foi aplicada em $brunoChromePath."
     }
     Set-Content -LiteralPath $brunoBrandMarker -Value $brunoBrandKey -Encoding ascii

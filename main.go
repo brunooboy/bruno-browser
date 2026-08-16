@@ -3,9 +3,11 @@ package main
 import (
 	"embed"
 	"log"
+	"os"
 
 	appcore "bruno-browser/internal/app"
 	"bruno-browser/internal/config"
+	"bruno-browser/internal/updates"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -16,6 +18,13 @@ import (
 var assets embed.FS
 
 func main() {
+	if handled, err := updates.RunApplyHelper(os.Args); handled {
+		if err != nil {
+			log.Printf("Bruno Browser updater: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
 	configuration, err := config.Default()
 	if err != nil {
 		log.Fatal(err)
@@ -24,7 +33,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	desktop := NewDesktop(core, configuration.SettingsPath(), core.Account.OAuthConfigured())
+	desktop := NewDesktop(
+		core, configuration.SettingsPath(), core.Account.OAuthConfigured(),
+		configuration.DataRoot, updates.UpdateHealthMarker(os.Args),
+	)
 	if err := wails.Run(&options.App{
 		Title:            "Bruno Browser",
 		Width:            1480,

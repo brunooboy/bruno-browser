@@ -20,22 +20,10 @@ var hiddenLegacyShortcuts = []string{
 	"a11bd361b9da3734518ab321ce86a44b", // http://donutbrowser.com/
 }
 
-func duckDuckGoSearchProvider() map[string]any {
-	return map[string]any{
-		"short_name":               "DuckDuckGo",
-		"keyword":                  "duckduckgo.com",
-		"url":                      "https://duckduckgo.com/?q={searchTerms}",
-		"suggestions_url":          "https://duckduckgo.com/ac/?q={searchTerms}&type=list",
-		"favicon_url":              "https://duckduckgo.com/favicon.ico",
-		"input_encodings":          []string{"UTF-8"},
-		"safe_for_autoreplace":     false,
-		"preconnect_to_search_url": true,
-		"is_active":                1,
-	}
-}
-
 // EnsureProfileIdentity persists the Bruno profile name in Chromium's own
-// profile files and removes obsolete third-party marketing shortcuts.
+// profile files and removes obsolete third-party marketing shortcuts. The
+// bundled Bruno Start extension owns the default search provider so Chromium
+// can update its protected preferences and Web Data database itself.
 func EnsureProfileIdentity(userDataDir, profileName string) error {
 	profileName = strings.TrimSpace(profileName)
 	if profileName == "" {
@@ -63,13 +51,6 @@ func EnsureProfileIdentity(userDataDir, profileName string) error {
 		blacklist := childObject(ntp, "most_visited_blacklist")
 		for _, shortcutHash := range hiddenLegacyShortcuts {
 			blacklist[shortcutHash] = nil
-		}
-		bruno := childObject(document, "bruno_browser")
-		if initialized, _ := bruno["search_provider_initialized"].(bool); !initialized {
-			providerData := childObject(document, "default_search_provider_data")
-			providerData["template_url_data"] = duckDuckGoSearchProvider()
-			providerData["mirrored_template_url_data"] = duckDuckGoSearchProvider()
-			bruno["search_provider_initialized"] = true
 		}
 	}); err != nil {
 		return fmt.Errorf("write Chromium profile identity: %w", err)

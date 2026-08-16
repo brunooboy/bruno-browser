@@ -1,10 +1,11 @@
 {
   "name": "bruno-browser-frontend",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "test:notifications": "node --experimental-strip-types --test tests/notifications.test.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"

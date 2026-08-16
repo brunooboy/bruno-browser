@@ -24,10 +24,12 @@ import (
 )
 
 type Desktop struct {
-	core            *appcore.Core
-	settingsPath    string
-	oauthConfigured bool
-	ctx             context.Context
+	core               *appcore.Core
+	settingsPath       string
+	oauthConfigured    bool
+	dataRoot           string
+	updateHealthMarker string
+	ctx                context.Context
 }
 
 type BootstrapState struct {
@@ -88,14 +90,18 @@ type ProfileInput struct {
 	StartURL  string               `json:"startUrl"`
 }
 
-func NewDesktop(core *appcore.Core, settingsPath string, oauthConfigured bool) *Desktop {
-	return &Desktop{core: core, settingsPath: settingsPath, oauthConfigured: oauthConfigured}
+func NewDesktop(core *appcore.Core, settingsPath string, oauthConfigured bool, dataRoot, updateHealthMarker string) *Desktop {
+	return &Desktop{
+		core: core, settingsPath: settingsPath, oauthConfigured: oauthConfigured,
+		dataRoot: dataRoot, updateHealthMarker: updateHealthMarker,
+	}
 }
 
 func (d *Desktop) startup(ctx context.Context) { d.ctx = ctx }
 
 func (d *Desktop) domReady(ctx context.Context) {
 	d.ctx = ctx
+	_ = updates.MarkHealthy(d.updateHealthMarker, d.dataRoot)
 	go func() {
 		status, err := d.core.Updates.Check(ctx)
 		if err != nil {
@@ -224,6 +230,36 @@ func (d *Desktop) SavePreferences(input preferences.Preferences) (preferences.Pr
 
 func (d *Desktop) GetUpdates() (updates.Status, error)      { return d.core.Updates.Current(d.context()) }
 func (d *Desktop) CheckForUpdates() (updates.Status, error) { return d.core.Updates.Check(d.context()) }
+
+func (d *Desktop) InstallUpdate() (updates.DownloadResult, error) {
+	result, err := d.core.Updates.DownloadLatest(d.context())
+	if err != nil {
+		return updates.DownloadResult{}, err
+	}
+	for _, process := range d.core.Browser.Running() {
+		stopContext, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		stopErr := d.core.Browser.Stop(stopContext, process.ProfileID)
+		cancel()
+		if stopErr != nil && !errors.Is(stopErr, browser.ErrProfileNotRunning) {
+			return updates.DownloadResult{}, fmt.Errorf("fechar perfil %s antes da atualização: %w", process.ProfileName, stopErr)
+		}
+	}
+	deadline := time.Now().Add(20 * time.Second)
+	for len(d.core.Browser.Running()) > 0 && time.Now().Before(deadline) {
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(d.core.Browser.Running()) > 0 {
+		return updates.DownloadResult{}, errors.New("alguns perfis ainda estão encerrando; aguarde e tente atualizar novamente")
+	}
+	if err := d.core.Updates.LaunchApplyHelper(d.context(), result); err != nil {
+		return updates.DownloadResult{}, err
+	}
+	go func(ctx context.Context) {
+		time.Sleep(750 * time.Millisecond)
+		runtime.Quit(ctx)
+	}(d.context())
+	return result, nil
+}
 
 func (d *Desktop) CopyText(value string) error {
 	if len(value) > 64<<10 {

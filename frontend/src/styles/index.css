@@ -2199,6 +2199,8 @@ button:disabled {
 }
 
 /* System modules: extensions, updates, settings and admin */
+.update-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.update-actions .primary-button { min-width: 150px; }
 .system-page {
   display: grid;
   gap: 15px;
@@ -2409,6 +2411,7 @@ button:disabled {
   .update-banner { grid-template-columns: 42px minmax(0,1fr); }
   .system-hero > .primary-button,
   .update-banner > .primary-button { grid-column: 1 / -1; justify-self: start; }
+  .update-banner > .update-actions { grid-column: 1 / -1; justify-content: flex-start; flex-wrap: wrap; }
   .release-timeline article { grid-template-columns: 100px minmax(0,1fr); }
   .release-timeline article > span { display: none; }
   .activation-form { grid-template-columns: 1fr; }

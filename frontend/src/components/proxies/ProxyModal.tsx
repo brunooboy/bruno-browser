@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BrowserProfile, DNSPreset, ProxyDraft, ProxyMode } from '../../types/profile'
 import { Icon } from '../common/Icon'
 import { Modal } from '../common/Modal'
@@ -27,14 +27,24 @@ const dnsPresets: { id: DNSPreset; label: string; provider: string; detail: stri
 export function ProxyModal({ initialProfile, open, profiles, onClose, onSave }: ProxyModalProps) {
   const [draft, setDraft] = useState<ProxyDraft>(emptyDraft)
   const [error, setError] = useState('')
+  const initializedForCurrentOpen = useRef(false)
   const selectedProfile = useMemo(() => profiles.find((profile) => profile.id === draft.profileId) ?? null, [draft.profileId, profiles])
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      initializedForCurrentOpen.current = false
+      return
+    }
+    // Profiles are refreshed from the Go backend every few seconds. Hydrate
+    // the form only once per opening so a refresh cannot overwrite edits that
+    // the user is currently making.
+    if (initializedForCurrentOpen.current) return
     const selected = initialProfile ?? profiles[0] ?? null
+    if (!selected) return
     const proxy = selected?.proxy
+    initializedForCurrentOpen.current = true
     setError('')
-    setDraft(selected ? {
+    setDraft({
       profileId: selected.id,
       mode: proxy?.mode ?? 'direct',
       dnsPreset: selected.dnsPreset ?? 'normal',
@@ -44,12 +54,13 @@ export function ProxyModal({ initialProfile, open, profiles, onClose, onSave }: 
       password: '',
       clearPassword: false,
       bypassList: proxy?.bypassList.join('\n') ?? '',
-    } : emptyDraft)
+    })
   }, [initialProfile, open, profiles])
 
   const selectProfile = (profileId: string) => {
     const profile = profiles.find((item) => item.id === profileId)
     const proxy = profile?.proxy
+    setError('')
     setDraft({
       profileId,
       mode: proxy?.mode ?? 'direct',

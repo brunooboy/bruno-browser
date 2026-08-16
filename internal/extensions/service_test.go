@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"bruno-browser/internal/domain"
@@ -68,6 +69,48 @@ func TestInstallAndAssignCRX3(t *testing.T) {
 	}
 	if len(installed) != 0 {
 		t.Fatalf("extension remained in library: %+v", installed)
+	}
+}
+
+func TestAssignsExtensionToProfileCreatedAfterServiceInitialization(t *testing.T) {
+	root := t.TempDir()
+	profiles, err := profile.NewStore(filepath.Join(root, "profiles"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	service, err := New(root, profiles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crxPath := filepath.Join(root, "sample.crx")
+	if err := os.WriteFile(crxPath, testCRX3(t), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	extension, err := service.InstallCRX(context.Background(), crxPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	metadata, err := profiles.Create(context.Background(), profile.Fields{
+		Name: "Perfil criado depois", Color: "#42ff91",
+		Platforms: []domain.Platform{domain.PlatformInstagram}, Status: domain.StatusStarting,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	extension, err = service.SetAssignments(context.Background(), extension.ID, []string{metadata.ID})
+	if err != nil {
+		t.Fatalf("SetAssignments for newly created profile: %v", err)
+	}
+	if !slices.Equal(extension.AssignedProfileIDs, []string{metadata.ID}) {
+		t.Fatalf("assigned profiles = %#v", extension.AssignedProfileIDs)
+	}
+	stored, err := profiles.Get(context.Background(), metadata.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored.ExtensionPaths) != 1 || stored.ExtensionPaths[0] != extension.Path {
+		t.Fatalf("new profile extension paths = %#v", stored.ExtensionPaths)
 	}
 }
 

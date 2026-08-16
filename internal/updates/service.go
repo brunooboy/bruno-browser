@@ -29,21 +29,45 @@ type Manifest struct {
 }
 
 type Status struct {
-	CurrentVersion  string    `json:"currentVersion"`
-	LatestVersion   string    `json:"latestVersion"`
-	UpdateAvailable bool      `json:"updateAvailable"`
-	CheckedAt       time.Time `json:"checkedAt"`
-	Source          string    `json:"source"`
-	Changelog       []Change  `json:"changelog"`
+	CurrentVersion   string    `json:"currentVersion"`
+	LatestVersion    string    `json:"latestVersion"`
+	UpdateAvailable  bool      `json:"updateAvailable"`
+	InstallAvailable bool      `json:"installAvailable"`
+	InstallReason    string    `json:"installReason,omitempty"`
+	Asset            *Asset    `json:"asset,omitempty"`
+	CheckedAt        time.Time `json:"checkedAt"`
+	Source           string    `json:"source"`
+	Changelog        []Change  `json:"changelog"`
 }
 
 type Service struct {
-	current  Manifest
-	endpoint string
-	client   *http.Client
+	current        Manifest
+	endpoint       string
+	dataRoot       string
+	client         *http.Client
+	downloadClient *http.Client
 }
 
-func New(endpoint string) (*Service, error) {
+type Option func(*Service)
+
+func WithDataRoot(dataRoot string) Option {
+	return func(service *Service) {
+		service.dataRoot = strings.TrimSpace(dataRoot)
+	}
+}
+
+func WithHTTPClients(checkClient, downloadClient *http.Client) Option {
+	return func(service *Service) {
+		if checkClient != nil {
+			service.client = checkClient
+		}
+		if downloadClient != nil {
+			service.downloadClient = downloadClient
+		}
+	}
+}
+
+func New(endpoint string, options ...Option) (*Service, error) {
 	var current Manifest
 	if err := json.Unmarshal(currentManifestPayload, &current); err != nil {
 		return nil, fmt.Errorf("decode embedded version manifest: %w", err)
@@ -51,11 +75,16 @@ func New(endpoint string) (*Service, error) {
 	if err := validateManifest(current); err != nil {
 		return nil, err
 	}
-	return &Service{
-		current:  current,
-		endpoint: strings.TrimSpace(endpoint),
-		client:   &http.Client{Timeout: 12 * time.Second},
-	}, nil
+	service := &Service{
+		current:        current,
+		endpoint:       strings.TrimSpace(endpoint),
+		client:         &http.Client{Timeout: 12 * time.Second},
+		downloadClient: secureDownloadClient(),
+	}
+	for _, option := range options {
+		option(service)
+	}
+	return service, nil
 }
 
 func (s *Service) Current(ctx context.Context) (Status, error) {
@@ -65,6 +94,7 @@ func (s *Service) Current(ctx context.Context) (Status, error) {
 	return Status{
 		CurrentVersion: s.current.Version,
 		LatestVersion:  s.current.Version,
+		InstallReason:  "nenhuma atualização disponível",
 		CheckedAt:      time.Now().UTC(),
 		Source:         "local",
 		Changelog:      append([]Change(nil), s.current.Changelog...),
@@ -98,14 +128,29 @@ func (s *Service) Check(ctx context.Context) (Status, error) {
 	if err := validateManifest(remote); err != nil {
 		return Status{}, err
 	}
-	return Status{
+	status := Status{
 		CurrentVersion:  s.current.Version,
 		LatestVersion:   remote.Version,
 		UpdateAvailable: compareVersions(remote.Version, s.current.Version) > 0,
 		CheckedAt:       time.Now().UTC(),
 		Source:          s.endpoint,
 		Changelog:       append([]Change(nil), remote.Changelog...),
-	}, nil
+	}
+	if !status.UpdateAvailable {
+		status.InstallReason = "nenhuma atualização disponível"
+		return status, nil
+	}
+	asset, assetErr := s.resolveInstallerAsset(ctx, remote.Version)
+	if assetErr != nil {
+		status.InstallReason = assetErr.Error()
+		return status, nil
+	}
+	status.Asset = &asset
+	status.InstallAvailable = s.dataRoot != ""
+	if !status.InstallAvailable {
+		status.InstallReason = "diretório local de atualizações não configurado"
+	}
+	return status, nil
 }
 
 func validateManifest(manifest Manifest) error {

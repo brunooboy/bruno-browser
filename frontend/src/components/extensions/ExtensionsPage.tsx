@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { BrowserProfile } from '../../types/profile'
 import type { InstalledExtension } from '../../types/system'
+import { retainExistingProfileIds } from '../../lib/profileAssignments'
 import { Icon } from '../common/Icon'
 import { PlatformIcon } from '../profiles/PlatformIcon'
 
@@ -26,6 +27,10 @@ export function ExtensionsPage({ extensions, profiles, desktopMode, premiumActiv
   }, [extensions, selectedId])
 
   useEffect(() => setAssignments(selected?.assignedProfileIds ?? []), [selected])
+
+  useEffect(() => {
+    setAssignments((current) => retainExistingProfileIds(current, profiles))
+  }, [profiles])
 
   const toggleProfile = (profileId: string) => {
     setAssignments((current) => current.includes(profileId)
@@ -83,7 +88,7 @@ export function ExtensionsPage({ extensions, profiles, desktopMode, premiumActiv
             </div>
             <footer className="system-panel__footer">
               <span><b>{assignments.length}</b> perfil(is) selecionado(s)</span>
-              <button className="primary-button" disabled={busy || !desktopMode || !premiumActive} onClick={() => onSaveAssignments(selected.id, assignments)} type="button"><Icon name="check" size={16} /> Salvar associação</button>
+              <button className="primary-button" disabled={busy || !desktopMode || !premiumActive} onClick={() => onSaveAssignments(selected.id, retainExistingProfileIds(assignments, profiles))} type="button"><Icon name="check" size={16} /> Salvar associação</button>
             </footer>
           </> : <div className="system-empty"><Icon name="layers" size={28} /><b>Selecione uma extensão</b><span>As opções de perfil aparecerão aqui.</span></div>}
         </section>

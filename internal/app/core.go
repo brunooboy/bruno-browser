@@ -101,7 +101,7 @@ func New(config config.Config) (*Core, error) {
 			return nil, fmt.Errorf("initialize bundled Bruno INSSIST extension: %w", err)
 		}
 	}
-	updateService, err := updates.New(config.UpdateURL)
+	updateService, err := updates.New(config.UpdateURL, updates.WithDataRoot(config.DataRoot))
 	if err != nil {
 		return nil, fmt.Errorf("initialize update service: %w", err)
 	}

@@ -2,7 +2,6 @@ package browser
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -52,41 +51,23 @@ func TestEnsureProfileIdentityCreatesAndPreservesProfileFiles(t *testing.T) {
 			t.Fatalf("Donut shortcut hash %s was not suppressed: %#v", shortcutHash, blacklist)
 		}
 	}
-	providerData := preferences["default_search_provider_data"].(map[string]any)
-	provider := providerData["template_url_data"].(map[string]any)
-	if provider["short_name"] != "DuckDuckGo" || provider["keyword"] != "duckduckgo.com" || provider["url"] != "https://duckduckgo.com/?q={searchTerms}" {
-		t.Fatalf("DuckDuckGo was not initialized as the default search provider: %#v", provider)
-	}
-	if fmt.Sprint(providerData["mirrored_template_url_data"]) != fmt.Sprint(providerData["template_url_data"]) {
-		t.Fatalf("default search mirror differs from its source: %#v", providerData)
+	if _, injected := preferences["default_search_provider_data"]; injected {
+		t.Fatalf("search preferences must be owned by Chromium's extension API: %#v", preferences["default_search_provider_data"])
 	}
 }
 
-func TestEnsureProfileIdentityDoesNotOverrideLaterSearchChoice(t *testing.T) {
-	userDataDir := t.TempDir()
-	if err := EnsureProfileIdentity(userDataDir, "Conta"); err != nil {
-		t.Fatal(err)
+func TestBrunoStartExtensionControlsDuckDuckGoSearch(t *testing.T) {
+	manifest := readIdentityJSON(t, filepath.Join("..", "..", "assets", "bruno-start", "manifest.json"))
+	overrides, ok := manifest["chrome_settings_overrides"].(map[string]any)
+	if !ok {
+		t.Fatal("Bruno Start manifest does not declare Chrome settings overrides")
 	}
-	preferencesPath := filepath.Join(userDataDir, "Default", "Preferences")
-	preferences := readIdentityJSON(t, preferencesPath)
-	providerData := preferences["default_search_provider_data"].(map[string]any)
-	providerData["template_url_data"] = map[string]any{
-		"short_name": "Escolha do usuário", "keyword": "example.test", "url": "https://example.test/?q={searchTerms}",
+	provider, ok := overrides["search_provider"].(map[string]any)
+	if !ok {
+		t.Fatal("Bruno Start manifest does not declare a search provider")
 	}
-	payload, err := json.Marshal(preferences)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(preferencesPath, payload, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := EnsureProfileIdentity(userDataDir, "Conta"); err != nil {
-		t.Fatal(err)
-	}
-	updated := readIdentityJSON(t, preferencesPath)
-	actual := updated["default_search_provider_data"].(map[string]any)["template_url_data"].(map[string]any)
-	if actual["short_name"] != "Escolha do usuário" {
-		t.Fatalf("a later user search choice was overwritten: %#v", actual)
+	if provider["name"] != "DuckDuckGo" || provider["keyword"] != "duckduckgo.com" || provider["search_url"] != "https://duckduckgo.com/?q={searchTerms}" || provider["is_default"] != true {
+		t.Fatalf("unexpected Bruno Start search provider: %#v", provider)
 	}
 }
 
