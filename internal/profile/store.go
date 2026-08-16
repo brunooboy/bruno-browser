@@ -21,9 +21,10 @@ import (
 )
 
 const (
-	metadataFileName = "metadata.json"
-	userDataDirName  = "chromium"
-	maxMetadataSize  = 1 << 20
+	metadataFileName       = "metadata.json"
+	metadataBackupFileName = "metadata.backup.json"
+	userDataDirName        = "chromium"
+	maxMetadataSize        = 1 << 20
 )
 
 var (
@@ -33,10 +34,11 @@ var (
 )
 
 type Paths struct {
-	Root       string
-	Metadata   string
-	UserData   string
-	Extensions string
+	Root           string
+	Metadata       string
+	MetadataBackup string
+	UserData       string
+	Extensions     string
 }
 
 type Fields struct {
@@ -155,8 +157,8 @@ func (s *Store) Get(ctx context.Context, id string) (domain.Metadata, error) {
 		return domain.Metadata{}, err
 	}
 
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.loadUnlocked(canonicalID)
 }
 
@@ -165,8 +167,8 @@ func (s *Store) List(ctx context.Context) ([]domain.Metadata, error) {
 		return nil, err
 	}
 
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	entries, err := os.ReadDir(s.root)
 	if err != nil {
@@ -376,10 +378,11 @@ func (s *Store) pathsForCanonicalID(id string) (Paths, error) {
 		return Paths{}, ErrInvalidID
 	}
 	return Paths{
-		Root:       root,
-		Metadata:   filepath.Join(root, metadataFileName),
-		UserData:   filepath.Join(root, userDataDirName),
-		Extensions: filepath.Join(root, "extensions"),
+		Root:           root,
+		Metadata:       filepath.Join(root, metadataFileName),
+		MetadataBackup: filepath.Join(root, metadataBackupFileName),
+		UserData:       filepath.Join(root, userDataDirName),
+		Extensions:     filepath.Join(root, "extensions"),
 	}, nil
 }
 
@@ -388,7 +391,30 @@ func (s *Store) loadUnlocked(canonicalID string) (domain.Metadata, error) {
 	if err != nil {
 		return domain.Metadata{}, err
 	}
-	file, err := os.Open(paths.Metadata)
+	metadata, primaryErr := readMetadataFile(paths.Metadata, canonicalID)
+	if primaryErr == nil {
+		if _, backupErr := readMetadataFile(paths.MetadataBackup, canonicalID); backupErr != nil {
+			if err := storage.WriteJSONAtomic(paths.MetadataBackup, metadata, 0o600); err != nil {
+				return domain.Metadata{}, fmt.Errorf("repair metadata backup: %w", err)
+			}
+		}
+		return metadata.Clone(), nil
+	}
+	if !errors.Is(primaryErr, ErrNotFound) && !errors.Is(primaryErr, ErrMetadataCorrupt) {
+		return domain.Metadata{}, primaryErr
+	}
+	metadata, backupErr := readMetadataFile(paths.MetadataBackup, canonicalID)
+	if backupErr != nil {
+		return domain.Metadata{}, primaryErr
+	}
+	if err := storage.WriteJSONAtomic(paths.Metadata, metadata, 0o600); err != nil {
+		return domain.Metadata{}, fmt.Errorf("restore metadata from backup: %w", err)
+	}
+	return metadata.Clone(), nil
+}
+
+func readMetadataFile(path, canonicalID string) (domain.Metadata, error) {
+	file, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return domain.Metadata{}, ErrNotFound
 	}
@@ -417,6 +443,10 @@ func (s *Store) loadUnlocked(canonicalID string) (domain.Metadata, error) {
 }
 
 func (s *Store) writeMetadata(path string, metadata domain.Metadata) error {
+	backupPath := filepath.Join(filepath.Dir(path), metadataBackupFileName)
+	if err := storage.WriteJSONAtomic(backupPath, metadata, 0o600); err != nil {
+		return fmt.Errorf("write metadata backup: %w", err)
+	}
 	if err := storage.WriteJSONAtomic(path, metadata, 0o600); err != nil {
 		return fmt.Errorf("write metadata: %w", err)
 	}

@@ -293,6 +293,12 @@ func (m *Manager) Engine() string {
 	return "bruno"
 }
 
+// Executable returns the validated Bruno Engine binary used for new profile
+// windows. Diagnostics use this instead of guessing installation paths.
+func (m *Manager) Executable() (string, error) {
+	return FindExecutable(m.config.ExecutablePath)
+}
+
 // Stop closes the Chromium process owned by a Bruno profile. CDP-capable
 // sessions receive Browser.close so Chromium can flush its disk-backed state.
 func (m *Manager) Stop(ctx context.Context, profileID string) error {

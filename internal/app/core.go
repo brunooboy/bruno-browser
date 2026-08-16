@@ -7,6 +7,7 @@ import (
 	"bruno-browser/internal/account"
 	"bruno-browser/internal/browser"
 	"bruno-browser/internal/config"
+	"bruno-browser/internal/diagnostics"
 	"bruno-browser/internal/extensions"
 	"bruno-browser/internal/fingerprint"
 	"bruno-browser/internal/license"
@@ -32,6 +33,7 @@ type Core struct {
 	Extensions  *extensions.Service
 	Updates     *updates.Service
 	Telemetry   *telemetry.Service
+	Diagnostics *diagnostics.Service
 }
 
 func New(config config.Config) (*Core, error) {
@@ -109,6 +111,13 @@ func New(config config.Config) (*Core, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initialize telemetry: %w", err)
 	}
+	diagnosticsService, err := diagnostics.New(
+		config.DataRoot, profiles, browserManager, networkManager, extensionService,
+		accountService, licenseService, updateService,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("initialize diagnostics: %w", err)
+	}
 	return &Core{
 		Profiles:    profiles,
 		Browser:     browserManager,
@@ -121,5 +130,6 @@ func New(config config.Config) (*Core, error) {
 		Extensions:  extensionService,
 		Updates:     updateService,
 		Telemetry:   telemetryService,
+		Diagnostics: diagnosticsService,
 	}, nil
 }

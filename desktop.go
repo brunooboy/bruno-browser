@@ -10,6 +10,7 @@ import (
 	"bruno-browser/internal/account"
 	appcore "bruno-browser/internal/app"
 	"bruno-browser/internal/browser"
+	"bruno-browser/internal/diagnostics"
 	"bruno-browser/internal/domain"
 	"bruno-browser/internal/extensions"
 	"bruno-browser/internal/license"
@@ -42,6 +43,7 @@ type BootstrapState struct {
 	OAuthConfigured bool                    `json:"oauthConfigured"`
 	SettingsPath    string                  `json:"settingsPath"`
 	Telemetry       telemetry.Snapshot      `json:"telemetry"`
+	Diagnostics     diagnostics.Report      `json:"diagnostics"`
 }
 
 type ProfileView struct {
@@ -141,11 +143,16 @@ func (d *Desktop) Bootstrap() (BootstrapState, error) {
 	if err != nil {
 		return BootstrapState{}, err
 	}
+	diagnosticReport, err := d.core.Diagnostics.Run(ctx)
+	if err != nil {
+		return BootstrapState{}, err
+	}
 	return BootstrapState{
 		Profiles: profiles, Account: user, Plan: plan, Preferences: prefs,
 		Updates: updateStatus, Extensions: extensionList,
 		OAuthConfigured: d.oauthConfigured, SettingsPath: d.settingsPath,
-		Telemetry: telemetrySnapshot,
+		Telemetry:   telemetrySnapshot,
+		Diagnostics: diagnosticReport,
 	}, nil
 }
 
@@ -171,45 +178,51 @@ func (d *Desktop) UpdateProfile(profileID string, input ProfileInput) (ProfileVi
 	return d.singleProfileView(d.context(), metadata)
 }
 
-func (d *Desktop) LaunchProfile(profileID, targetURL string) (browser.ProcessInfo, error) {
+func (d *Desktop) LaunchProfile(profileID, targetURL string) (info browser.ProcessInfo, operationErr error) {
 	if err := d.requirePremium(); err != nil {
 		return browser.ProcessInfo{}, err
 	}
-	info, err := d.core.Browser.Launch(d.context(), profileID, strings.TrimSpace(targetURL))
-	_ = d.core.Telemetry.RecordLaunch(d.context(), profileID, err == nil)
-	return info, err
+	defer func() { d.recordFailure("profile_launch", operationErr) }()
+	info, operationErr = d.core.Browser.Launch(d.context(), profileID, strings.TrimSpace(targetURL))
+	_ = d.core.Telemetry.RecordLaunch(d.context(), profileID, operationErr == nil)
+	return info, operationErr
 }
 
 func (d *Desktop) StopProfile(profileID string) error {
 	return d.core.Browser.Stop(d.context(), profileID)
 }
 
-func (d *Desktop) DeleteProfile(profileID string) (maintenance.Report, error) {
+func (d *Desktop) DeleteProfile(profileID string) (report maintenance.Report, operationErr error) {
+	defer func() { d.recordFailure("profile_delete", operationErr) }()
 	return d.core.Maintenance.DeleteProfile(d.context(), profileID)
 }
 
-func (d *Desktop) ClearProfileCache(profileID string) (maintenance.Report, error) {
+func (d *Desktop) ClearProfileCache(profileID string) (report maintenance.Report, operationErr error) {
+	defer func() { d.recordFailure("profile_cache", operationErr) }()
 	return d.core.Maintenance.ClearHistoryAndCache(d.context(), profileID)
 }
 
-func (d *Desktop) ClearProfileSession(profileID string) (maintenance.Report, error) {
+func (d *Desktop) ClearProfileSession(profileID string) (report maintenance.Report, operationErr error) {
+	defer func() { d.recordFailure("profile_session", operationErr) }()
 	return d.core.Maintenance.ClearCookiesAndSession(d.context(), profileID)
 }
 
-func (d *Desktop) SaveNetwork(profileID string, input network.SaveInput) (network.Settings, error) {
+func (d *Desktop) SaveNetwork(profileID string, input network.SaveInput) (settings network.Settings, operationErr error) {
 	if err := d.requirePremium(); err != nil {
 		return network.Settings{}, err
 	}
+	defer func() { d.recordFailure("network_save", operationErr) }()
 	return d.core.Network.Save(d.context(), profileID, input)
 }
 
-func (d *Desktop) TestNetwork(profileID string) (network.TestResult, error) {
+func (d *Desktop) TestNetwork(profileID string) (result network.TestResult, operationErr error) {
 	if err := d.requirePremium(); err != nil {
 		return network.TestResult{}, err
 	}
-	result, err := d.core.Network.TestProxy(d.context(), profileID)
-	_ = d.core.Telemetry.RecordProxyTest(d.context(), profileID, err == nil, result.LatencyMs)
-	return result, err
+	defer func() { d.recordFailure("network_test", operationErr) }()
+	result, operationErr = d.core.Network.TestProxy(d.context(), profileID)
+	_ = d.core.Telemetry.RecordProxyTest(d.context(), profileID, operationErr == nil, result.LatencyMs)
+	return result, operationErr
 }
 
 func (d *Desktop) GetTelemetry() (telemetry.Snapshot, error) {
@@ -231,10 +244,11 @@ func (d *Desktop) SavePreferences(input preferences.Preferences) (preferences.Pr
 func (d *Desktop) GetUpdates() (updates.Status, error)      { return d.core.Updates.Current(d.context()) }
 func (d *Desktop) CheckForUpdates() (updates.Status, error) { return d.core.Updates.Check(d.context()) }
 
-func (d *Desktop) InstallUpdate() (updates.DownloadResult, error) {
-	result, err := d.core.Updates.DownloadLatest(d.context())
-	if err != nil {
-		return updates.DownloadResult{}, err
+func (d *Desktop) InstallUpdate() (result updates.DownloadResult, operationErr error) {
+	defer func() { d.recordFailure("update_install", operationErr) }()
+	result, operationErr = d.core.Updates.DownloadLatest(d.context())
+	if operationErr != nil {
+		return updates.DownloadResult{}, operationErr
 	}
 	for _, process := range d.core.Browser.Running() {
 		stopContext, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -330,24 +344,28 @@ func (d *Desktop) InstallExtension() (extensions.Extension, error) {
 	if path == "" {
 		return extensions.Extension{}, errors.New("installation cancelled")
 	}
-	return d.core.Extensions.InstallCRX(d.context(), path)
+	extension, installErr := d.core.Extensions.InstallCRX(d.context(), path)
+	d.recordFailure("extension_install", installErr)
+	return extension, installErr
 }
 
 func (d *Desktop) ListExtensions() ([]extensions.Extension, error) {
 	return d.core.Extensions.List(d.context())
 }
 
-func (d *Desktop) SetExtensionAssignments(extensionID string, profileIDs []string) (extensions.Extension, error) {
+func (d *Desktop) SetExtensionAssignments(extensionID string, profileIDs []string) (extension extensions.Extension, operationErr error) {
 	if err := d.requirePremium(); err != nil {
 		return extensions.Extension{}, err
 	}
+	defer func() { d.recordFailure("extension_assign", operationErr) }()
 	return d.core.Extensions.SetAssignments(d.context(), extensionID, profileIDs)
 }
 
-func (d *Desktop) RemoveExtension(extensionID string) error {
+func (d *Desktop) RemoveExtension(extensionID string) (operationErr error) {
 	if err := d.requirePremium(); err != nil {
 		return err
 	}
+	defer func() { d.recordFailure("extension_remove", operationErr) }()
 	installed, err := d.core.Extensions.List(d.context())
 	if err != nil {
 		return err
@@ -364,6 +382,17 @@ func (d *Desktop) RemoveExtension(extensionID string) error {
 		break
 	}
 	return d.core.Extensions.Remove(d.context(), extensionID)
+}
+
+func (d *Desktop) RunDiagnostics() (diagnostics.Report, error) {
+	return d.core.Diagnostics.Run(d.context())
+}
+
+func (d *Desktop) ClearDiagnosticLog() (diagnostics.Report, error) {
+	if err := d.core.Diagnostics.Clear(d.context()); err != nil {
+		return diagnostics.Report{}, err
+	}
+	return d.core.Diagnostics.Run(d.context())
 }
 
 func (d *Desktop) listProfiles(ctx context.Context) ([]ProfileView, error) {
@@ -510,6 +539,13 @@ func (d *Desktop) context() context.Context {
 		return context.Background()
 	}
 	return d.ctx
+}
+
+func (d *Desktop) recordFailure(scope string, operationErr error) {
+	if operationErr == nil || errors.Is(operationErr, context.Canceled) || strings.Contains(strings.ToLower(operationErr.Error()), "cancelled") || d.core == nil || d.core.Diagnostics == nil {
+		return
+	}
+	_ = d.core.Diagnostics.Record(context.WithoutCancel(d.context()), scope, operationErr)
 }
 
 func (input ProfileInput) fields(extensionPaths []string) profile.Fields {

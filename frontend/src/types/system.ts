@@ -160,6 +160,26 @@ export interface AppPreferences {
   accentColor: string
 }
 
+export interface DiagnosticCheck {
+  id: string
+  label: string
+  status: 'pass' | 'warning' | 'fail'
+  detail: string
+}
+
+export interface DiagnosticIncident {
+  at: string
+  scope: string
+  message: string
+}
+
+export interface SystemDiagnostics {
+  generatedAt: string
+  status: 'ready' | 'attention' | 'blocked'
+  checks: DiagnosticCheck[]
+  incidents: DiagnosticIncident[]
+}
+
 export interface BootstrapState {
   profiles: NativeProfile[]
   account?: DiscordAccount
@@ -170,6 +190,7 @@ export interface BootstrapState {
   oauthConfigured: boolean
   settingsPath: string
   telemetry: DashboardTelemetry
+  diagnostics: SystemDiagnostics
 }
 
 export interface KeyClaims {

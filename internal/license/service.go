@@ -31,6 +31,7 @@ const (
 var (
 	ErrNoActivePlan = errors.New("an active plan is required")
 	ErrInvalidKey   = errors.New("invalid activation key")
+	ErrCorruptState = errors.New("activation state is corrupt")
 )
 
 type Plan string
@@ -77,15 +78,29 @@ type Service struct {
 	mu             sync.Mutex
 }
 
-func New(dataRoot string) (*Service, error) {
+type Option func(*Service)
+
+func WithClock(clock func() time.Time) Option {
+	return func(service *Service) {
+		if clock != nil {
+			service.clock = clock
+		}
+	}
+}
+
+func New(dataRoot string, options ...Option) (*Service, error) {
 	if strings.TrimSpace(dataRoot) == "" {
 		return nil, errors.New("data root is required")
 	}
-	return &Service{
+	service := &Service{
 		activationPath: filepath.Join(dataRoot, activationFileName),
 		historyPath:    filepath.Join(dataRoot, historyFileName),
 		clock:          time.Now,
-	}, nil
+	}
+	for _, option := range options {
+		option(service)
+	}
+	return service, nil
 }
 
 func (s *Service) Generate(ctx context.Context, discordID string, plan Plan) (HistoryEntry, error) {
@@ -180,6 +195,10 @@ func (s *Service) Status(ctx context.Context, loggedDiscordID string) (Activatio
 	if errors.Is(err, os.ErrNotExist) {
 		return Activation{Status: "none"}, nil
 	}
+	if errors.Is(err, ErrCorruptState) {
+		_ = os.Remove(s.activationPath)
+		return Activation{Status: "none"}, nil
+	}
 	if err != nil {
 		return Activation{}, err
 	}
@@ -242,7 +261,14 @@ func (s *Service) readActivation() (storedActivation, error) {
 	decoder := json.NewDecoder(io.LimitReader(file, 128<<10))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&stored); err != nil {
-		return storedActivation{}, fmt.Errorf("decode activation: %w", err)
+		return storedActivation{}, fmt.Errorf("%w: decode activation: %v", ErrCorruptState, err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return storedActivation{}, fmt.Errorf("%w: trailing JSON content", ErrCorruptState)
+	}
+	if strings.TrimSpace(stored.Key) == "" || stored.Activation.KeyID == "" || !stored.Activation.Plan.Valid() {
+		return storedActivation{}, fmt.Errorf("%w: activation fields are incomplete", ErrCorruptState)
 	}
 	return stored, nil
 }

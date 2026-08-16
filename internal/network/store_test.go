@@ -120,6 +120,36 @@ func TestDefaultProtectorRoundTrip(t *testing.T) {
 	}
 }
 
+func TestHTTPAndSOCKS5SelectionSurvivesStoreReload(t *testing.T) {
+	profiles, metadata := createNetworkTestProfile(t)
+	store, err := NewStore(profiles, testProtector{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Save(context.Background(), metadata.ID, SaveInput{
+		Mode: ModeHTTP, DNSPreset: DNSHigh, Host: "http.proxy.example", Port: 8080,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	httpSettings, err := store.Get(context.Background(), metadata.ID)
+	if err != nil || httpSettings.Mode != ModeHTTP || httpSettings.DNSPreset != DNSHigh {
+		t.Fatalf("HTTP selection was not preserved: %+v, %v", httpSettings, err)
+	}
+	if _, err := store.Save(context.Background(), metadata.ID, SaveInput{
+		Mode: ModeSOCKS5, DNSPreset: DNSPro, Host: "socks.proxy.example", Port: 1080,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := NewStore(profiles, testProtector{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	socksSettings, err := reloaded.Get(context.Background(), metadata.ID)
+	if err != nil || socksSettings.Mode != ModeSOCKS5 || socksSettings.DNSPreset != DNSPro || socksSettings.Host != "socks.proxy.example" {
+		t.Fatalf("SOCKS5 selection was not preserved after reload: %+v, %v", socksSettings, err)
+	}
+}
+
 type testProtector struct{}
 
 func (testProtector) Protect(value []byte) (string, error) {

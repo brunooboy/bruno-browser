@@ -172,6 +172,35 @@ function Set-BrunoEngineBranding {
     Set-Content -LiteralPath $brunoBrandMarker -Value $brunoBrandKey -Encoding ascii
 }
 
+function Set-BrunoApplicationBranding {
+    param(
+        [Parameter(Mandatory = $true)][string]$ExecutablePath,
+        [Parameter(Mandatory = $true)][string]$ToolPath,
+        [Parameter(Mandatory = $true)][string]$Version
+    )
+    if (-not (Test-Path -LiteralPath $ExecutablePath)) { return }
+
+    $brunoIconPath = Join-Path $brunoWorkspace 'build\windows\icon.ico'
+    Write-Host "Aplicando identidade Bruno Browser em $ExecutablePath..."
+    & $ToolPath $ExecutablePath `
+        --set-icon $brunoIconPath `
+        --set-file-version $Version `
+        --set-product-version $Version `
+        --set-version-string ProductName 'Bruno Browser' `
+        --set-version-string FileDescription 'Bruno Browser' `
+        --set-version-string CompanyName 'Bruno Browser' `
+        --set-version-string InternalName 'Bruno Browser' `
+        --set-version-string OriginalFilename 'Bruno Browser.exe'
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    $brunoVersionInfo = (Get-Item -LiteralPath $ExecutablePath).VersionInfo
+    if ($brunoVersionInfo.ProductName -ne 'Bruno Browser' -or
+        $brunoVersionInfo.CompanyName -ne 'Bruno Browser' -or
+        $brunoVersionInfo.ProductVersion -notlike "$Version*") {
+        throw "A identidade do Bruno Browser não foi aplicada em $ExecutablePath."
+    }
+}
+
 function Copy-BrunoStartExtension {
     param([Parameter(Mandatory = $true)][string]$EngineDestination)
     $brunoStartDestination = Join-Path $EngineDestination 'bruno-start'
@@ -197,6 +226,7 @@ function Copy-BrunoNativeExtensions {
 
 $brunoEngineManifestPath = Join-Path $brunoWorkspace 'scripts\engine-manifest.json'
 $brunoEngineManifest = Get-Content -LiteralPath $brunoEngineManifestPath -Raw | ConvertFrom-Json
+$brunoApplicationVersion = [string]((Get-Content -LiteralPath (Join-Path $brunoWorkspace 'wails.json') -Raw | ConvertFrom-Json).info.productVersion)
 $brunoEngineAmd64 = Get-BrunoEnginePlatform -Architecture 'amd64' -Definition $brunoEngineManifest.platforms.amd64
 $brunoEngineArm64 = Get-BrunoEnginePlatform -Architecture 'arm64' -Definition $brunoEngineManifest.platforms.arm64
 $brunoBrandingTool = Get-BrunoBrandingTool -Definition $brunoEngineManifest.branding
@@ -221,6 +251,7 @@ if ($Direct) {
     New-Item -ItemType Directory -Force -Path $brunoOutputDirectory | Out-Null
     & $brunoGoPath build -trimpath -tags 'desktop,production' -ldflags '-w -s -H windowsgui' -o (Join-Path $brunoOutputDirectory 'Bruno Browser.exe') .
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    Set-BrunoApplicationBranding -ExecutablePath (Join-Path $brunoOutputDirectory 'Bruno Browser.exe') -ToolPath $brunoBrandingTool -Version $brunoApplicationVersion
     $brunoDirectEngine = Join-Path $brunoOutputDirectory 'engine'
     if (Test-Path -LiteralPath $brunoDirectEngine) {
         Remove-Item -LiteralPath $brunoDirectEngine -Recurse -Force
@@ -247,9 +278,28 @@ if (Test-Path -LiteralPath $brunoWailsPath) {
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $brunoAmd64Executable = Join-Path $brunoWorkspace 'build\bin\Bruno Browser-amd64.exe'
+$brunoArm64Executable = Join-Path $brunoWorkspace 'build\bin\Bruno Browser-arm64.exe'
 $brunoPortableExecutable = Join-Path $brunoWorkspace 'build\bin\Bruno Browser.exe'
+Set-BrunoApplicationBranding -ExecutablePath $brunoAmd64Executable -ToolPath $brunoBrandingTool -Version $brunoApplicationVersion
+Set-BrunoApplicationBranding -ExecutablePath $brunoArm64Executable -ToolPath $brunoBrandingTool -Version $brunoApplicationVersion
 if (Test-Path -LiteralPath $brunoAmd64Executable) {
     Copy-Item -LiteralPath $brunoAmd64Executable -Destination $brunoPortableExecutable -Force
+}
+
+if (-not $NoInstaller) {
+    $brunoInstallerDirectory = Join-Path $brunoWorkspace 'build\windows\installer'
+    $brunoMakeNsis = Join-Path $brunoNsisBin 'makensis.exe'
+    if (-not (Test-Path -LiteralPath $brunoMakeNsis)) {
+        throw 'O compilador NSIS não foi encontrado para finalizar o instalador com a identidade do aplicativo.'
+    }
+    Write-Host 'Recompilando o instalador com os executáveis identificados...'
+    Push-Location $brunoInstallerDirectory
+    try {
+        & $brunoMakeNsis "-DARG_WAILS_AMD64_BINARY=$brunoAmd64Executable" "-DARG_WAILS_ARM64_BINARY=$brunoArm64Executable" 'project.nsi'
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    } finally {
+        Pop-Location
+    }
 }
 
 $brunoLocalEngine = Join-Path $brunoWorkspace 'build\bin\engine'
@@ -264,7 +314,7 @@ Copy-BrunoNativeExtensions -ApplicationDestination (Join-Path $brunoWorkspace 'b
 if (-not $NoInstaller) {
     foreach ($brunoPortable in @(
         @{ Architecture = 'amd64'; Executable = $brunoAmd64Executable; Engine = $brunoEngineAmd64 },
-        @{ Architecture = 'arm64'; Executable = (Join-Path $brunoWorkspace 'build\bin\Bruno Browser-arm64.exe'); Engine = $brunoEngineArm64 }
+        @{ Architecture = 'arm64'; Executable = $brunoArm64Executable; Engine = $brunoEngineArm64 }
     )) {
         if (-not (Test-Path -LiteralPath $brunoPortable.Executable)) { continue }
         $brunoPortableRoot = Join-Path $brunoWorkspace ".cache\portable\$($brunoPortable.Architecture)"

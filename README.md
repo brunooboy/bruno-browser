@@ -4,7 +4,7 @@
 
 Navegador de perfis local-first para Windows, feito com Go, Wails, React e TypeScript. Cada perfil usa um diretório físico próprio do Chromium, preservando cookies, sessões e armazenamento local no disco.
 
-> Versão atual: **1.2.0** · Windows 10/11 · x64 e ARM64
+> Versão atual: **1.3.0** · Windows 10/11 · x64 e ARM64
 
 ## Instalação
 
@@ -32,6 +32,8 @@ O pacote atual ainda não possui assinatura Authenticode. Por isso, o Microsoft 
 - Licenças locais AES-256-GCM, planos de 1, 7 e 30 dias ou vitalício.
 - Changelog e verificação de atualização por manifesto JSON.
 - Tema e central de notificações persistentes.
+- Diagnóstico integrado de engine, disco, perfis, rede, extensões, licença e atualizações, com registro local limitado de falhas.
+- Backup atômico de `metadata.json` e restauração automática do perfil quando o arquivo principal é interrompido ou corrompido.
 
 As operações premium são validadas novamente pelo backend antes de iniciar perfil, alterar rede ou gerenciar extensões. Remover uma key ou atingir a data de expiração bloqueia essas operações imediatamente. Uma rota HTTP/SOCKS5 pode ser salva com o perfil aberto e entra em vigor na próxima abertura.
 
@@ -47,10 +49,12 @@ bruno-browser/
 ├── keys-history.json
 ├── license.json
 ├── preferences.json
+├── diagnostics-log.json     últimas 100 falhas operacionais, sem senhas
 ├── updates/                 downloads verificados e rollback temporário
 └── profiles/
     └── <profile-uuid>/
         ├── metadata.json
+        ├── metadata.backup.json
         ├── fingerprint.json
         ├── fingerprint-verification.json
         ├── network.json

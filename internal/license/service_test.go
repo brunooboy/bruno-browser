@@ -2,6 +2,9 @@ package license
 
 import (
 	"context"
+	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -82,5 +85,27 @@ func TestOneDayPlanExpiresExactlyAfterOneDay(t *testing.T) {
 	}
 	if status.Status != "expired" || status.Activated {
 		t.Fatalf("one-day activation did not expire: %+v", status)
+	}
+}
+
+func TestCorruptActivationIsQuarantinedWithoutBlockingStartup(t *testing.T) {
+	root := t.TempDir()
+	service, err := New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, activationFileName)
+	if err := os.WriteFile(path, []byte(`{"activation":{"status":"active"},"key":"broken"} trailing`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status, err := service.Status(context.Background(), "123456789012345678")
+	if err != nil {
+		t.Fatalf("corrupt local activation must not block application startup: %v", err)
+	}
+	if status.Status != "none" || status.Activated {
+		t.Fatalf("unexpected status for corrupt activation: %+v", status)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("corrupt activation file was not removed: %v", err)
 	}
 }

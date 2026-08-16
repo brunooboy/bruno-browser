@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react'
-import type { AppPreferences, DiscordAccount, PlanStatus } from '../../types/system'
+import type { AppPreferences, DiscordAccount, PlanStatus, SystemDiagnostics } from '../../types/system'
 import { Icon } from '../common/Icon'
 
 interface SettingsPageProps {
@@ -10,10 +10,13 @@ interface SettingsPageProps {
   settingsPath: string
   desktopMode: boolean
   busy: boolean
+  diagnostics: SystemDiagnostics
   onActivate: (key: string) => Promise<void>
   onDeactivate: () => Promise<void>
+  onClearDiagnostics: () => Promise<void>
   onLogin: () => Promise<void>
   onLogout: () => Promise<void>
+  onRunDiagnostics: () => Promise<void>
   onSaveTheme: (color: string) => Promise<void>
 }
 
@@ -32,6 +35,7 @@ export function SettingsPage(props: SettingsPageProps) {
   const [accent, setAccent] = useState(props.preferences.accentColor)
   const [key, setKey] = useState('')
   const statusLabel = props.plan.status === 'active' ? 'ATIVO' : props.plan.status === 'expired' ? 'EXPIRADO' : 'NENHUM'
+  const diagnosticsLabel = props.diagnostics.status === 'ready' ? 'PRONTO' : props.diagnostics.status === 'attention' ? 'ATENÇÃO' : 'BLOQUEADO'
 
   return (
     <div className="system-page settings-page">
@@ -72,6 +76,26 @@ export function SettingsPage(props: SettingsPageProps) {
           <label><span>KEY DE ATIVAÇÃO</span><textarea onChange={(event) => setKey(event.target.value)} placeholder="Cole aqui a key Base64URL..." rows={3} value={key} /></label>
           <button className="primary-button" disabled={props.busy || !props.desktopMode || !props.account || !key.trim()} onClick={() => props.onActivate(key)} type="button"><Icon name="shield" size={16} /> Ativar key</button>
         </div>}
+      </section>
+
+      <section className="system-panel diagnostics-panel">
+        <header><div><span>HOMOLOGAÇÃO LOCAL</span><h3>Diagnóstico do aplicativo</h3></div><span className={`diagnostics-status diagnostics-status--${props.diagnostics.status}`}><i /> {diagnosticsLabel}</span></header>
+        <div className="diagnostics-summary">
+          {props.diagnostics.checks.length ? props.diagnostics.checks.map((check) => <article className={`diagnostic-check diagnostic-check--${check.status}`} key={check.id}>
+            <span>{check.status === 'pass' ? <Icon name="check" size={14} /> : <Icon name="alert" size={14} />}</span>
+            <div><strong>{check.label}</strong><small>{check.detail}</small></div>
+          </article>) : <div className="diagnostics-empty"><Icon name="activity" /><span>Execute o diagnóstico no aplicativo desktop.</span></div>}
+        </div>
+        <div className="diagnostics-actions">
+          <button className="primary-button" disabled={props.busy || !props.desktopMode} onClick={props.onRunDiagnostics} type="button"><Icon name="activity" size={15} /> Executar diagnóstico</button>
+          <small>Última leitura: {props.diagnostics.generatedAt.startsWith('1970-') ? 'ainda não executado' : new Date(props.diagnostics.generatedAt).toLocaleString('pt-BR')}</small>
+        </div>
+        <div className="diagnostics-log">
+          <header><span>FALHAS RECENTES</span><button className="ghost-button" disabled={props.busy || !props.desktopMode || props.diagnostics.incidents.length === 0} onClick={props.onClearDiagnostics} type="button"><Icon name="trash" size={13} /> Limpar registro</button></header>
+          {props.diagnostics.incidents.length ? props.diagnostics.incidents.slice(0, 8).map((incident, index) => <article key={`${incident.at}-${incident.scope}-${index}`}>
+            <time>{new Date(incident.at).toLocaleString('pt-BR')}</time><b>{incident.scope.replaceAll('_', ' ')}</b><span>{incident.message}</span>
+          </article>) : <p>Nenhuma falha operacional registrada neste dispositivo.</p>}
+        </div>
       </section>
     </div>
   )

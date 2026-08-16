@@ -21,14 +21,15 @@ import { useNow } from './hooks/useNow'
 import { createProfileId, sortProfiles } from './lib/profile'
 import { loadNotifications, persistNotifications, prependNotification } from './lib/notifications'
 import type { BrowserProfile, Platform, ProfileDraft, ProfileStatus, ProfileTag, ProxyDraft } from './types/profile'
-import type { AppNotification, BootstrapState, DashboardTelemetry, DiscordAccount, InstalledExtension, KeyClaims, KeyHistoryEntry, LicensePlan, NativeProfile, PlanStatus, UpdateDownloadResult, UpdateStatus } from './types/system'
+import type { AppNotification, BootstrapState, DashboardTelemetry, DiscordAccount, InstalledExtension, KeyClaims, KeyHistoryEntry, LicensePlan, NativeProfile, PlanStatus, SystemDiagnostics, UpdateDownloadResult, UpdateStatus } from './types/system'
 
 let toastSequence = 0
 
 const fallbackUpdates: UpdateStatus = {
-  currentVersion: '1.2.0', latestVersion: '1.2.0', updateAvailable: false, installAvailable: false,
+  currentVersion: '1.3.0', latestVersion: '1.3.0', updateAvailable: false, installAvailable: false,
   checkedAt: new Date().toISOString(), source: 'local',
   changelog: [
+    { version: '1.3.0', date: '2026-08-16', description: 'Diagnóstico integrado, registro local de falhas, recuperação automática de metadados e homologação dos fluxos críticos.' },
     { version: '1.2.0', date: '2026-08-16', description: 'Atualizador com SHA-256 e rollback, formulário de proxy estável e associação de extensões sincronizada com perfis recém-criados.' },
     { version: '1.1.0', date: '2026-08-16', description: 'Perfis alinhados ao ambiente nativo, DuckDuckGo padrão, tema escuro forçado, cinco políticas DoH e extensão Bruno INSSIST opcional por perfil.' },
     { version: '1.0.0', date: '2026-08-16', description: 'Bruno Engine com identidade visual própria, página inicial local e fingerprint isolado e verificado por perfil.' },
@@ -49,6 +50,9 @@ const emptyTelemetry: DashboardTelemetry = {
   summary: { totalProfiles: 0, newProfilesThisMonth: 0, runningProfiles: 0, successfulLaunches24h: 0, configuredProxies: 0, healthyProxies: 0, proxyHealthPercent: 0, medianProxyLatencyMs: 0, attentionProfiles: 0 },
   signals: { overall: 0, fingerprint: 0, network: 0, sessions: 0, label: 'Aguardando dados', detail: 'O núcleo local ainda não enviou uma leitura' },
   activity: [], profiles: [],
+}
+const emptyDiagnostics: SystemDiagnostics = {
+  generatedAt: '1970-01-01T00:00:00.000Z', status: 'attention', checks: [], incidents: [],
 }
 
 const toBrowserProfile = (profile: NativeProfile): BrowserProfile => ({
@@ -120,6 +124,7 @@ export default function App() {
   const [settingsPath, setSettingsPath] = useState('')
   const [keyHistory, setKeyHistory] = useState<KeyHistoryEntry[]>([])
   const [telemetry, setTelemetry] = useState<DashboardTelemetry>(emptyTelemetry)
+  const [diagnostics, setDiagnostics] = useState<SystemDiagnostics>(emptyDiagnostics)
   const [notifications, setNotifications] = useState<AppNotification[]>(() => loadNotifications(localStorage))
   const [coreOnline, setCoreOnline] = useState(false)
   const profileSyncRevision = useRef(0)
@@ -158,6 +163,7 @@ export default function App() {
     setOAuthConfigured(state.oauthConfigured)
     setSettingsPath(state.settingsPath)
     setTelemetry(state.telemetry)
+    setDiagnostics(state.diagnostics)
   }
 
   useEffect(() => {
@@ -373,6 +379,21 @@ export default function App() {
     catch (error) { notify(errorText(error), 'warning') } finally { setBusy(false) }
   }
 
+  const handleRunDiagnostics = async () => {
+    setBusy(true)
+    try {
+      const report = await invoke<SystemDiagnostics>('RunDiagnostics')
+      setDiagnostics(report)
+      notify(report.status === 'ready' ? 'Diagnóstico concluído: todos os subsistemas estão prontos.' : report.status === 'attention' ? 'Diagnóstico concluído com pontos de atenção.' : 'Diagnóstico encontrou uma falha que precisa de correção.', report.status === 'ready' ? 'success' : 'warning')
+    } catch (error) { notify(errorText(error), 'warning') } finally { setBusy(false) }
+  }
+
+  const handleClearDiagnostics = async () => {
+    setBusy(true)
+    try { setDiagnostics(await invoke<SystemDiagnostics>('ClearDiagnosticLog')); notify('Registro local de falhas limpo.', 'info') }
+    catch (error) { notify(errorText(error), 'warning') } finally { setBusy(false) }
+  }
+
   const handleLogin = async () => {
     setBusy(true)
     try { const user = await invoke<DiscordAccount>('LoginDiscord'); setAccount(user); setPlan(await invoke<PlanStatus>('LicenseStatus')); notify(`Discord conectado como ${user.username}.`) }
@@ -425,13 +446,13 @@ export default function App() {
       {activeSection === 'proxies' ? <ProxyPage onConfigure={openProxyModal} onTest={handleTestProxy} premiumActive={premiumActive} profiles={profiles.filter((item) => !search.trim() || [item.name, item.id, item.proxy?.host ?? 'direto'].some((value) => value.toLowerCase().includes(search.toLowerCase())))} testingId={testingProxyId} />
       : activeSection === 'extensions' ? <ExtensionsPage busy={busy} desktopMode={desktopMode} extensions={extensions} onInstall={handleInstallExtension} onRemove={handleRemoveExtension} onSaveAssignments={handleAssignExtension} premiumActive={premiumActive} profiles={profiles} />
       : activeSection === 'updates' ? <UpdatesPage busy={busy} desktopMode={desktopMode} onCheck={handleCheckUpdates} onInstall={handleInstallUpdate} status={updates} />
-      : activeSection === 'settings' ? <SettingsPage account={account} busy={busy} desktopMode={desktopMode} oauthConfigured={oauthConfigured} onActivate={handleActivate} onDeactivate={handleDeactivate} onLogin={handleLogin} onLogout={handleLogout} onSaveTheme={handleSaveTheme} plan={plan} preferences={{ accentColor }} settingsPath={settingsPath} />
+      : activeSection === 'settings' ? <SettingsPage account={account} busy={busy} desktopMode={desktopMode} diagnostics={diagnostics} oauthConfigured={oauthConfigured} onActivate={handleActivate} onClearDiagnostics={handleClearDiagnostics} onDeactivate={handleDeactivate} onLogin={handleLogin} onLogout={handleLogout} onRunDiagnostics={handleRunDiagnostics} onSaveTheme={handleSaveTheme} plan={plan} preferences={{ accentColor }} settingsPath={settingsPath} />
       : activeSection === 'admin' && account?.isAdmin ? <AdminPage busy={busy} history={keyHistory} onCopy={handleCopy} onGenerate={handleGenerateKey} onInspect={handleInspectKey} />
       : <div className="dashboard-content">
         <StatsGrid telemetry={telemetry} /><ActivityChart telemetry={telemetry} />
         <ProfileFilters count={visibleProfiles.length} onManageTags={() => setTagModalOpen(true)} onPlatformChange={setPlatform} onSortChange={setSort} onStatusChange={setStatus} onViewChange={setView} platform={platform} sort={sort} status={status} view={view} />
         {visibleProfiles.length ? <section aria-label="Lista de perfis" className={`profiles-layout profiles-layout--${view}`}>{visibleProfiles.map((item) => <ProfileCard key={item.id} now={now} onAction={handleProfileAction} onLaunch={handleLaunch} premiumActive={premiumActive} profile={item} view={view} />)}</section> : <ProfileEmptyState onReset={resetFilters} />}
-        <footer className="dashboard-footer"><span>BRUNO BROWSER // LOCAL OPERATIONS TERMINAL</span><span><i /> DADOS DO PERFIL: DISCO LOCAL</span><span>BUILD 1.2.0</span></footer>
+        <footer className="dashboard-footer"><span>BRUNO BROWSER // LOCAL OPERATIONS TERMINAL</span><span><i /> DADOS DO PERFIL: DISCO LOCAL</span><span>BUILD 1.3.0</span></footer>
       </div>}
     </main>
     <ProfileModal onClose={() => { setProfileModalOpen(false); setEditingProfile(null) }} onManageTags={() => setTagModalOpen(true)} onSave={handleSaveProfile} open={profileModalOpen} profile={editingProfile} tags={tags} />

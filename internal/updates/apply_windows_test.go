@@ -23,8 +23,8 @@ func TestMarkHealthyOnlyWritesInsideUpdateHealthDirectory(t *testing.T) {
 }
 
 func TestUpdaterArgumentHelpers(t *testing.T) {
-	args := []string{"Bruno Browser.exe", helperSwitch, "--version=1.2.0", healthFilePrefix + `C:\safe\health.ok`}
-	if !containsArgument(args, helperSwitch) || argumentValue(args, "--version=") != "1.2.0" {
+	args := []string{"Bruno Browser.exe", helperSwitch, "--version=1.3.0", healthFilePrefix + `C:\safe\health.ok`}
+	if !containsArgument(args, helperSwitch) || argumentValue(args, "--version=") != "1.3.0" {
 		t.Fatalf("updater arguments were not parsed: %#v", args)
 	}
 	if UpdateHealthMarker(args) != `C:\safe\health.ok` {

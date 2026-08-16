@@ -93,6 +93,48 @@ func TestStoreRejectsInvalidProfileID(t *testing.T) {
 	}
 }
 
+func TestStoreRestoresCorruptMetadataFromAtomicBackup(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := store.Create(context.Background(), validFields())
+	if err != nil {
+		t.Fatal(err)
+	}
+	updatedFields := validFields()
+	updatedFields.Name = "Perfil recuperável"
+	updated, err := store.Update(context.Background(), metadata.ID, updatedFields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths, err := store.Paths(metadata.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(paths.MetadataBackup); err != nil {
+		t.Fatalf("metadata backup was not created: %v", err)
+	}
+	if err := os.WriteFile(paths.Metadata, []byte(`{"schemaVersion":`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := store.Get(context.Background(), metadata.ID)
+	if err != nil {
+		t.Fatalf("Get did not recover the profile: %v", err)
+	}
+	if recovered.ID != updated.ID || recovered.Name != "Perfil recuperável" {
+		t.Fatalf("unexpected recovered metadata: %+v", recovered)
+	}
+	payload, err := os.ReadFile(paths.Metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var repaired domain.Metadata
+	if err := json.Unmarshal(payload, &repaired); err != nil || repaired.Name != recovered.Name {
+		t.Fatalf("primary metadata was not repaired: %+v, %v", repaired, err)
+	}
+}
+
 func validFields() Fields {
 	return Fields{
 		Name:      "Conta Google 01",
